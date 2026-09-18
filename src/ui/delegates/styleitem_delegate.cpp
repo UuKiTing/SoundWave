@@ -54,6 +54,15 @@ QRect StyleItemDelegate::favBtnRectFor(const QRect &r, int btnSize, int btnMargi
                  btnSize);
 }
 
+
+QRect StyleItemDelegate::markIconRectFor(const QRect &r, int btnSize, int btnMarginRight)
+{
+    return QRect(r.right() - btnMarginRight - btnSize,
+                 r.center().y() - btnSize / 2,
+                 btnSize,
+                 btnSize);
+}
+
 void StyleItemDelegate::textRectsFor(QRect &titleRect, QRect &artistRect, const QRect &r,int marginLeft, int width)
 {
     int margin = r.height() / 10;
@@ -108,13 +117,14 @@ void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
 
     // 右侧保留区域：时长 + 按钮
     QRect durRect = durationRectFor(option.rect, DUR_WIDTH, DUR_MARGIN_RIGHT);
-    QRect btnRect = favBtnRectFor(option.rect, BUTTON_SIZE, BUTTON_MARGIN_RIGHT);
+    QRect favBtnRect = favBtnRectFor(option.rect, BUTTON_SIZE, BUTTON_MARGIN_RIGHT);
+    QRect markIconRect = markIconRectFor(option.rect, BUTTON_SIZE, MARK_ICON_MARGIN_RIGHT);
 
 
     // 文本区域
     int textLeft = iconRect.right() + TEXT_MARGIN_LEFT;
     QRect titleRect, artistRect;
-    textRectsFor(titleRect, artistRect, option.rect, textLeft, (btnRect.left() - textLeft) / 2);
+    textRectsFor(titleRect, artistRect, option.rect, textLeft, (favBtnRect.left() - textLeft) / 2);
 
 
     const QColor &titleColor = isPlaying ? selectdColor : blackColor;
@@ -150,15 +160,22 @@ void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
                       elidedArtist);
     painter->drawText(durRect,
                       Qt::AlignRight | Qt::AlignVCenter,
-                      index.data(Roles::DurationString).toString());
+                      toDurationString(index.data(Roles::Duration).toInt()));
     painter->restore();
-
 
     // 绘制收藏按钮
     painter->save();
     QIcon favIcon = isFavorite ? QIcon(":/icon/love.png") : QIcon(":/icon/dislove.png");
-    favIcon.paint(painter, btnRect);
+    favIcon.paint(painter, favBtnRect);
     painter->restore();
+
+
+    painter->save();
+    SongSource source = index.data(Roles::Source).value<SongSource>();
+    QIcon markIcon = source == SongSource::Local ? QIcon("://icon/local.png") : QIcon(":/icon/remote.png");
+    markIcon.paint(painter, markIconRect);
+    painter->restore();
+
 }
 
 

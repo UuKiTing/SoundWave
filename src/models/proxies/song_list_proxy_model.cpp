@@ -8,17 +8,23 @@ PlayListProxyModel::PlayListProxyModel(QObject *parent)
 void PlayListProxyModel::setAllowedSongIds(const QSet<int> &songIds)
 {
     m_allowedSongIds = songIds;
+    m_visiableRows.clear();
+
+    for(int row = 0; row < sourceModel()->rowCount(); ++row){
+        int id = sourceModel()->index(row, 0).data(Roles::Id).toInt();
+
+        if(m_allowedSongIds.contains(id)){
+            m_visiableRows.insert(row);
+            m_allowedSongIds.remove(id);
+        }
+    }
+
     invalidateFilter();
 }
 
 bool PlayListProxyModel::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
 {
-    if (m_allowedSongIds.isEmpty()) {
-        return false;
-    }
+    if(m_visiableRows.isEmpty()) return false;
 
-    QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
-    int songId = index.data(Roles::Id).toInt();
-
-    return m_allowedSongIds.contains(songId);
+    return m_visiableRows.contains(source_row);
 }

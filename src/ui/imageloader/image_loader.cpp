@@ -1,13 +1,21 @@
 #include "image_loader.h"
 #include "global.h"
+#include "url_config.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QImage>
 #include <QTimer>
 #include <QThread>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QEventLoop>
+
 
 ImageLoader::ImageLoader(QObject *parent)
-    : QObject{parent}{}
+    : QObject{parent}{
+
+    m_manager = new QNetworkAccessManager(this);
+}
 
 ImageLoader::~ImageLoader(){
     stop();
@@ -15,7 +23,38 @@ ImageLoader::~ImageLoader(){
 
 QImage ImageLoader::loadImage(const QString &path)
 {
-    return QImage(path);
+    if (!path.startsWith("http://", Qt::CaseInsensitive) &&
+        !path.startsWith("https://", Qt::CaseInsensitive)) {
+        return QImage(path);
+    }
+
+    QUrl url(path);
+    QNetworkRequest request(url);
+    QNetworkReply *reply = m_manager->get(request);
+
+    QEventLoop loop;
+
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(&timer, &QTimer::timeout, reply, &QNetworkReply::abort);
+
+    loop.exec();
+
+    QImage img;
+    if(reply->error() == QNetworkReply::NoError){
+        QByteArray data = reply->readAll();
+        img.loadFromData(data);
+    }
+    else{
+        qWarning() << "Image Download Failed:" << path << "Reason:" << reply->errorString();
+    }
+
+    reply->deleteLater();
+
+    return img;
 }
 
 void ImageLoader::addTask(const ImageTask& task)
@@ -75,20 +114,27 @@ void ImageLoader::run()
             m_set.remove(mergeTask.path);
         }
 
-        for(ImageTask &task : mergeTask.arr){
-            if(m_cache.contains(task.key)){
-                emit imageLoaded(mergeTask.path, task.var);
+        QVector<ImageTask> pendingTasks;
+        {
+            QMutexLocker locker(&m_mutex);
+            for(ImageTask &task : mergeTask.arr){
+                if(m_cache.contains(task.key)){
+                    emit imageLoaded(mergeTask.path, task.var);
+                }
+                else{
+                    pendingTasks.append(task);
+                }
             }
+        }
 
+        if(pendingTasks.isEmpty()){
             continue;
         }
 
         QImage source = loadImage(mergeTask.path);
 
         if(!source.isNull()){
-            for(int i = 0; i < mergeTask.arr.size(); ++i){
-                ImageTask task = mergeTask.arr[i];
-
+            for(const ImageTask &task : pendingTasks){
                 QImage image = CoverUtils::roundImage(source, task.size, task.radius);
 
                 m_cache.insert(task.key, new QImage(image));

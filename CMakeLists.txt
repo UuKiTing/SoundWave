@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(MusicPlayer VERSION 0.1 LANGUAGES CXX)
+project(SoundWave VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,7 @@ set(CMAKE_AUTORCC ON)
 # 1. 查找 Qt6 依赖
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Sql Widgets Concurrent)
 find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 
 # 开启 IDE 物理文件夹映射
@@ -24,10 +25,6 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
     "src/*.h"
     "src/*ui"
 )
-
-# file(GLOB_RECURSE UI_FILES CONFIGURE_DEPENDS
-#     "src/*ui"
-# )
 
 
 file(GLOB_RECURSE RES_FILES CONFIGURE_DEPENDS
@@ -49,14 +46,10 @@ qt_add_executable(${PROJECT_NAME}
     ${RES_FILES}
 )
 
-
-target_link_libraries(MusicPlayer PRIVATE Qt6::Core)
+target_link_libraries(SoundWave PRIVATE Qt6::Core)
+target_link_libraries(SoundWave PRIVATE Qt6::Core)
 
 # 5. 配置 AUTOUIC 搜索路径
-# set_target_properties(${PROJECT_NAME} PROPERTIES
-#     AUTOUIC_SEARCH_PATHS
-#         "${CMAKE_CURRENT_SOURCE_DIR}/src/ui;${CMAKE_CURRENT_SOURCE_DIR}/src/ui/views;${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets;${CMAKE_CURRENT_SOURCE_DIR}/src/ui/forms"
-# )
 set_target_properties(${PROJECT_NAME} PROPERTIES
     AUTOUIC_SEARCH_PATHS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/forms"
@@ -79,6 +72,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/models/proxies
     ${CMAKE_CURRENT_SOURCE_DIR}/src/db
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/http
     ${CMAKE_CURRENT_SOURCE_DIR}/taglib/include
 )
 
@@ -93,6 +87,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Sql
     Qt6::Widgets
     Qt6::Concurrent
+    Qt6::Network
     tag
 )
 

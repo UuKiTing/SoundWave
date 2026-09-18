@@ -17,10 +17,6 @@ UISideBar::UISideBar(QWidget *parent)
     // 设置按钮组
     m_group = new QButtonGroup(this);
 
-    // 设置用户头像
-    QIcon icon = roundPixmap(QPixmap(":/images/avatar.png"), QSize(50, 50), 25);
-    ui->avatarBtn->setIcon(icon);
-
     m_createSonglistDialog = new QDialog(this);
     m_createSonglistDialog->setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog); // 设置无边框和对话框属性
     m_createSonglistDialog->setAttribute(Qt::WA_TranslucentBackground); // 设置背景透明
@@ -34,7 +30,7 @@ UISideBar::UISideBar(QWidget *parent)
     connectSignals();
 
     // 从数据库中查询用户的歌单，并创建对应的歌单按钮
-    QList<PlayListInfo> list = DbManager::getInstance().queryPlaylists(1);
+    QList<PlayListInfo> list = DbManager::getInstance().queryPlaylists();
     for(const auto &info : list){
         createPlaylist(info);
     }
@@ -354,19 +350,29 @@ void UISideBar::on_settingBtn_clicked()
 {
     // emit pageChanged(Page::Setting);
 
-    QNetworkAccessManager manager;
-    QNetworkReply *reply = manager.get(QNetworkRequest(QUrl("http://127.0.0.1:8080/json")));
+    // QNetworkAccessManager *manager = new QNetworkAccessManager(this);
 
-    // 用局部事件循环等待结果（仅适合简单脚本/测试）
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    loop.exec();
+    // QNetworkRequest request(QUrl("http://192.168.85.168:8080/songs"));
 
-    if (reply->error() == QNetworkReply::NoError)
-        qDebug() << reply->readAll();
-    else
-        qDebug() << reply->errorString();
+    // QNetworkReply *reply = manager->get(request);
 
-    reply->deleteLater();
+    // connect(&reply, &QNetworkReply::finished, this, [this, rely](){
+
+    // });
+
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 

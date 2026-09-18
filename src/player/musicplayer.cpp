@@ -30,7 +30,9 @@ MusicPlayer::MusicPlayer(QWidget *parent)
     m_uiMain->setModel(m_uiMain->listView(), m_songManager->localModel());
     m_uiMain->setModel(m_uiMain->collectListView(), m_songManager->collectModel());
     m_uiMain->setModel(m_uiMain->songListView(), m_songManager->playlistModel());
+    m_uiMain->setModel(m_uiMain->remoteListView(), m_songManager->remoteModel());
     m_uiSearch->setModel(m_uiSearch->searchListView(), m_songManager->searchModel());
+
 
     // 初始化布局
     initLayout();

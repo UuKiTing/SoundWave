@@ -19,6 +19,7 @@ public:
     static QRect iconRectFor(const QRect &r, int iconSize);
     static QRect durationRectFor(const QRect &r, int durWidth, int durMarginRight);
     static QRect favBtnRectFor(const QRect &r, int btnSize, int btnMarginRight);
+    static QRect markIconRectFor(const QRect &r, int btnSize, int btnMarginRight);
     static void textRectsFor(QRect &titleRect, QRect &artistRect, const QRect &r,int marginLeft, int width);
 
     virtual void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
@@ -38,6 +39,7 @@ private:
     const int DUR_WIDTH = 50;
     const int BUTTON_SIZE  = 20;
     const int BUTTON_MARGIN_RIGHT = 25 + DUR_WIDTH + DUR_MARGIN_RIGHT;
+    const int MARK_ICON_MARGIN_RIGHT = 25 + BUTTON_SIZE +  BUTTON_MARGIN_RIGHT;
     const int TEXT_MARGIN_LEFT = 15;
 
     ImageLoader* m_loader;

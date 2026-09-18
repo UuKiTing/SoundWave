@@ -46,6 +46,7 @@ public:
     QListView* listView(); // 获取音乐列表视图
     QListView* collectListView(); // 获取收藏音乐列表视图
     QListView* songListView(); // 获取歌单列表视图
+    QListView* remoteListView();
     QSlider* progressSlider(); // 获取进度条
     QSlider* volumeSlider(); // 获取音量条
     int progressValue(); // 获取进度条的值
@@ -93,6 +94,8 @@ private slots:
     void on_songListView_doubleClicked(const QModelIndex &index);
 
     void on_playlistBtn_clicked();
+
+    void on_remoteListView_doubleClicked(const QModelIndex &index);
 
 private:
     void connectSignal(); // 连接信号槽

@@ -15,6 +15,8 @@ public:
 
 private:
     QSet<int> m_allowedSongIds{};
+
+    QSet<int> m_visiableRows{};
 };
 
 #endif // SONG_LIST_PROXY_MODEL_H

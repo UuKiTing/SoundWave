@@ -10,6 +10,7 @@
 #include <QSet>
 #include <QModelIndex>
 #include <QSize>
+#include <QNetworkAccessManager>
 
 
 
@@ -60,6 +61,8 @@ private:
     bool m_stop = false;
 
     CoverCacheManager &m_cache = CoverCacheManager::getInstance();
+
+    QNetworkAccessManager *m_manager{};
 };
 
 #endif // IMAGE_LOADER_H

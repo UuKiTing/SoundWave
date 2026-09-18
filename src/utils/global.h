@@ -35,7 +35,6 @@ enum Roles{
     Title,
     Artist,
     Duration,
-    DurationString,
     FilePath,
     CoverPath,
     LyricsPath,

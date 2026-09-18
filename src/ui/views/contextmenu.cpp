@@ -50,7 +50,7 @@ bool ContextMenu::addSongToPlaylist(QAction *action)
 
     if(DbManager::getInstance().songCountInPlaylist(playlist_id) == 1){
 
-        DbManager::getInstance().updatePlaylistCover(path, playlist_id);
+        DbManager::getInstance().updatePlaylistCover("songImage/" + path.split("/").back(), playlist_id);
 
         action->setIcon(QIcon(path));
 
@@ -147,7 +147,7 @@ ContextMenu::init()
 
     m_moveToMenu = new QMenu("移动到");
 
-    QList<PlayListInfo> list = DbManager::getInstance().queryPlaylists(1);
+    QList<PlayListInfo> list = DbManager::getInstance().queryPlaylists();
     for(auto &info : list){
         addPlaylist(info);
     }

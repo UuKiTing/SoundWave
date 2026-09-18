@@ -34,11 +34,15 @@ SongManager::SongManager(QObject *parent)
     m_playlistModel->setSourceModel(m_songlistModel);
     m_playlistModel->setProperty("proxyId", QVariant::fromValue(ProxyId::SongList));
 
+    m_remoteModel = new RemoteProxyModel(this);
+    m_remoteModel->setSourceModel(m_songlistModel);
+    m_remoteModel->setProperty("proxyId", QVariant::fromValue(ProxyId::NetWork));
+
     m_playbackState = new SongPlayBackSate(this);
 
     m_listLoader = new SongListLoader(this);
 
-    loadSongs();
+    loadSongs();    
 }
 
 
@@ -46,6 +50,8 @@ SongManager::SongManager(QObject *parent)
 void SongManager::loadSongs()
 {
     m_listLoader->loadSongs(m_songlistModel);
+
+    m_listLoader->loadRemoteSongs(m_songlistModel);
 }
 
 
@@ -170,6 +176,11 @@ PlayListProxyModel *SongManager::playlistModel()
     return m_playlistModel;
 }
 
+RemoteProxyModel *SongManager::remoteModel()
+{
+    return m_remoteModel;
+}
+
 SongPlayBackSate *SongManager::playbackState()
 {
     return m_playbackState;
@@ -200,7 +211,7 @@ QSortFilterProxyModel *SongManager::proxyModel(ProxyId id)
 {
     switch (id) {
     case ProxyId::Local:    return m_localModel;
-    // case ProxyId::OnLine:  return m_net;
+    case ProxyId::NetWork:  return m_remoteModel;
     case ProxyId::Collect: return m_collectModel;
     case ProxyId::SongList:   return m_playlistModel;
     case ProxyId::Search:    return m_searchModel;

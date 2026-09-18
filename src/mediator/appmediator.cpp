@@ -225,6 +225,7 @@ void AppMediator::collectSong(bool isCollect, const QModelIndex &index)
     int song_id = idx.data(Roles::Id).toInt();
 
     bool dbOk = false;
+
     if(isCollect) dbOk = DbManager::getInstance().collectSong(song_id);
     else  dbOk = DbManager::getInstance().disCollectSong(song_id);
 

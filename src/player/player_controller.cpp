@@ -20,16 +20,40 @@ PlayerController::PlayerController(QObject *parent)
 
 }
 
-
 bool PlayerController::setSource(const QModelIndex &index)
 {
+    // QString filePath = index.data(Roles::FilePath).toString();
+    // if(!QFile::exists(filePath)){
+    //     qCWarning(playerLog) << "音频文件不存在:" << filePath;
+    //     return false;
+    // }
+
+    // m_player->setSource(QUrl::fromLocalFile(filePath));
+    // return true;
+
     QString filePath = index.data(Roles::FilePath).toString();
-    if(!QFile::exists(filePath)){
-        qCWarning(playerLog) << "音频文件不存在:" << filePath;
+    if(filePath.isEmpty()){
+        qCWarning(playerLog) << "音频路径为空!";
         return false;
     }
 
-    m_player->setSource(QUrl::fromLocalFile(filePath));
+    QUrl url;
+
+    if (filePath.startsWith("http://", Qt::CaseInsensitive) ||
+        filePath.startsWith("https://", Qt::CaseInsensitive)) {
+
+        url  = QUrl::fromUserInput(filePath);
+    }
+    else{
+        if(!QFile::exists(filePath)){
+            qCWarning(playerLog) << "音频文件不存在:" << filePath;
+            return false;
+        }
+
+        url = QUrl::fromLocalFile(filePath);
+    }
+
+    m_player->setSource(url);
     return true;
 }
 

@@ -40,7 +40,6 @@ DbManager::DbManager()
 
     m_isValid = true;
 
-    createUsersTable();
     createSongTable();
     createCollectionTable();
     createPlaylistsTable();
@@ -58,9 +57,8 @@ DbManager &DbManager::getInstance()
 QList<SongInfo> DbManager::loadSongs()
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT * FROM songs LEFT JOIN (SELECT music_id FROM collection WHERE user_id = :user_id) as coll "
+    query.prepare("SELECT * FROM songs LEFT JOIN (SELECT music_id FROM collection) as coll "
                   "ON coll.music_id = songs.id;");
-    query.bindValue(":user_id", 1);
 
     if(!query.exec()){
         qCWarning(dbLog) << "加载歌曲信息失败：" << query.lastError().text();
@@ -83,7 +81,6 @@ QList<SongInfo> DbManager::loadSongs()
         info.lyricsPath = query.record().value("lyrics").toString();
         info.isFavo = !query.record().value("music_id").isNull();
         info.isPlaying = false;
-
 
         list.append(info);
     }
@@ -129,8 +126,7 @@ bool DbManager::collectSong(int song_id)
 {
     m_db.transaction(); // 开启事务
     QSqlQuery query(m_db);
-    query.prepare("INSERT INTO collection (user_id, music_id)VALUES(:user_id, :music_id)");
-    query.bindValue(":user_id", 1);
+    query.prepare("INSERT INTO collection (music_id)VALUES(:music_id)");
     query.bindValue(":music_id", song_id);
 
     if(!query.exec()){
@@ -152,14 +148,7 @@ bool DbManager::disCollectSong(int song_id)
 {
     m_db.transaction();
     QSqlQuery query(m_db);
-    // query.prepare("DELETE FROM collection WHERE user_id = :user_id AND music_id = :music_id");
-    if (!query.prepare("DELETE FROM collection WHERE user_id = :user_id AND music_id = :music_id")) {
-        m_db.rollback();
-        qCWarning(dbLog) << "prepare 失败：" << query.lastError().text();
-        return false;
-    }
-
-    query.bindValue(":user_id", 1);
+    query.prepare("DELETE FROM collection WHERE music_id = :music_id");
     query.bindValue(":music_id", song_id);
 
     if(!query.exec()){
@@ -176,13 +165,30 @@ bool DbManager::disCollectSong(int song_id)
     return true;
 }
 
+QList<int> DbManager::queryColletSongs()
+{
+    m_db.transaction();
+    QSqlQuery query(m_db);
+    query.prepare("SELECT music_id FROM collection");
+
+    if(!query.exec()){
+        qCWarning(dbLog) << "查找收藏歌曲失败：" << query.lastError().text();
+        return {};
+    }
+
+    QList<int> list;
+
+    while(query.next()) list.append(query.value(0).toInt());
+
+    return list;
+}
+
 PlayListInfo DbManager::createPlaylist(int user_id, const QString &name)
 {
     m_db.transaction(); // 开启事务
     QSqlQuery query(m_db);
 
-    query.prepare("INSERT INTO playlists (user_id, name, cover_path) VALUES(:user_id, :name, :cover_path);");
-    query.bindValue(":user_id", user_id);
+    query.prepare("INSERT INTO playlists (name, cover_path) VALUES(:name, :cover_path);");
     query.bindValue(":name", name);
     query.bindValue(":cover_path", ":/icon/cover.png");
 
@@ -201,11 +207,10 @@ PlayListInfo DbManager::createPlaylist(int user_id, const QString &name)
     return queryOneOfPlaylists(user_id, name);
 }
 
-QList<PlayListInfo> DbManager::queryPlaylists(int user_id)
+QList<PlayListInfo> DbManager::queryPlaylists()
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT * FROM playlists WHERE user_id = :user_id;");
-    query.bindValue(":user_id", user_id);
+    query.prepare("SELECT * FROM playlists");
 
     if(!query.exec()){
         qCWarning(dbLog) << "查询所有歌单失败：" << query.lastError().text();
@@ -230,8 +235,7 @@ QList<PlayListInfo> DbManager::queryPlaylists(int user_id)
 PlayListInfo DbManager::queryOneOfPlaylists(int user_id, const QString &name)
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT * FROM playlists WHERE user_id = :user_id AND name = :name;");
-    query.bindValue(":user_id", user_id);
+    query.prepare("SELECT * FROM playlists WHERE name = :name;");
     query.bindValue(":name", name);
 
     PlayListInfo info;
@@ -254,11 +258,7 @@ QSet<int> DbManager::queryPlaylistId(int playlist_id)
 {
     QSqlQuery query(m_db);
     query.prepare(R"(
-        SELECT s.id, s.title, s.artist, ps.sort_order
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        WHERE ps.playlist_id = :playlist_id
-        ORDER BY ps.sort_order DESC;
+        SELECT * FROM playlist_songs  WHERE playlist_id = :playlist_id ORDER BY sort_order DESC
 )");
 
     query.bindValue(":playlist_id", playlist_id);
@@ -269,7 +269,6 @@ QSet<int> DbManager::queryPlaylistId(int playlist_id)
         qCWarning(dbLog) << "查询歌单列表id失败：" << query.lastError().text();
         return {};
     }
-
 
     while(query.next())
         set.insert(query.record().value("id").toInt());
@@ -445,22 +444,6 @@ QSet<int> DbManager::findPlaylistsBySong(int song_id)
     return set;
 }
 
-void DbManager::createUsersTable()
-{
-    QSqlQuery query(m_db);
-    QString sql = R"(
-        CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL
-            );
-    )";
-
-    if(!query.exec(sql)){
-        qCWarning(dbLog) << "创建 users 表失败::" << query.lastError().text();
-        return;
-    }
-}
-
 void DbManager::createSongTable()
 {
     QSqlQuery query(m_db);
@@ -488,13 +471,10 @@ void DbManager::createCollectionTable()
     QString sql = R"(
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            music_id INTEGER NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (music_id) REFERENCES songs(id) ON DELETE CASCADE,
-            UNIQUE (user_id, music_id)
+            music_id INTEGER NOT NULL UNIQUE
             );
     )";
+
 
     if(!query.exec(sql)){
         qCWarning(dbLog) << "创建 collection 表失败:" << query.lastError().text();
@@ -508,12 +488,12 @@ void DbManager::createPlaylistsTable()
     QString sql = R"(
         CREATE TABLE IF NOT EXISTS playlists (
             id INTEGER PRIMARY KEY,
-            user_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             cover_path TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
+            UNIQUE(name)
+            );
     )";
+
 
     if(!query.exec(sql)){
         qCWarning(dbLog) << "创建 playlists 表失败:" << query.lastError().text();
@@ -531,7 +511,6 @@ void DbManager::createPlaylistSongsTable()
             song_id INTEGER NOT NULL,
             sort_order INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-            FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
             UNIQUE(playlist_id, song_id)
         );
     )";

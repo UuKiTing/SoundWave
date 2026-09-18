@@ -26,7 +26,7 @@
         <file>icon/networking.png</file>
         <file>icon/play2.png</file>
         <file>icon/setting.png</file>
-        <file>icon/localNormal.png</file>
-        <file>icon/localSelected.png</file>
+        <file>icon/local.png</file>
+        <file>icon/remote.png</file>
     </qresource>
 </RCC>

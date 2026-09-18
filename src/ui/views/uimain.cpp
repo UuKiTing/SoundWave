@@ -24,11 +24,13 @@ UIMain::UIMain(QWidget *parent)
     ui->listView->setItemDelegate(m_delegate);
     ui->collectListView->setItemDelegate(m_delegate);
     ui->songListView->setItemDelegate(m_delegate);
+    ui->remoteListView->setItemDelegate(m_delegate);
 
     // 设置列表视图的右键菜单策略
     ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->collectListView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->songListView->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->remoteListView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     initVolumeMenu(); // 初始化音量菜单
 
@@ -58,6 +60,10 @@ void UIMain::connectSignal()
     connect(ui->songListView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
          contextMenu.show(ui->songListView, pos);
     });
+    connect(ui->remoteListView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
+        contextMenu.show(ui->remoteListView, pos);
+    });
+
 
     connect(&contextMenu, &ContextMenu::songlistCoverUpdated, this, &UIMain::setSonglistCover);
 
@@ -270,6 +276,11 @@ QListView *UIMain::songListView()
     return ui->songListView;
 }
 
+QListView *UIMain::remoteListView()
+{
+    return ui->remoteListView;
+}
+
 
 QSlider *UIMain::progressSlider()
 {
@@ -419,5 +430,11 @@ void UIMain::on_playlistBtn_clicked()
         QModelIndex index = model->index(0, 0);
         this->doubleClickPlay(index, true);
     }
+}
+
+
+void UIMain::on_remoteListView_doubleClicked(const QModelIndex &index)
+{
+    this->doubleClickPlay(index, true);
 }
 

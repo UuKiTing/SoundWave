@@ -6,6 +6,7 @@
 #include "search_proxy_model.h"
 #include "song_list_proxy_model.h"
 #include "local_proxy_model.h"
+#include "remote_proxy_model.h"
 #include "song_list_model.h"
 #include "song_playback_sate.h"
 #include "song_list_loader.h"
@@ -39,6 +40,7 @@ public:
     CollectProxyModel* collectModel(); // 返回收藏代理model
     SearchProxyModel* searchModel(); // 返回搜索代理model
     PlayListProxyModel* playlistModel(); // 返回歌单代理model
+    RemoteProxyModel* remoteModel();
     SongPlayBackSate* playbackState();
 
     QModelIndex currentIndex(); // 返回当前行的代理index
@@ -70,6 +72,7 @@ private:
     SearchProxyModel *m_searchModel{};
     PlayListProxyModel *m_playlistModel{};
     LocalProxyModel *m_localModel{};
+    RemoteProxyModel *m_remoteModel{};
 
     SongPlayBackSate *m_playbackState{};
 

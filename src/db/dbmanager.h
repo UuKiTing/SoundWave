@@ -20,9 +20,10 @@ public:
     bool appendMusicData(const SongInfo &info); // 添加新歌曲
     bool collectSong(int song_id); // 收藏歌曲
     bool disCollectSong(int song_id); // 取消歌曲收藏
+    QList<int> queryColletSongs();
 
     PlayListInfo createPlaylist(int user_id, const QString &name); // 创建一个歌单
-    QList<PlayListInfo> queryPlaylists(int user_id); // 查询该用户的所有歌单
+    QList<PlayListInfo> queryPlaylists(); // 查询该用户的所有歌单
     PlayListInfo  queryOneOfPlaylists(int user_id, const QString &name); // 查询该用户的某个歌单
     QSet<int> queryPlaylistId(int playlist_id); // 查询该歌单下的所有歌曲id
     bool insertSongToPlaylist(int palylist_id, int song_id); // 添加歌曲到歌单
@@ -38,7 +39,6 @@ public:
     DbManager& operator=(const DbManager&) = delete;
 
 private:
-    void createUsersTable();
     void createSongTable();
     void createCollectionTable();
     void createPlaylistsTable();
