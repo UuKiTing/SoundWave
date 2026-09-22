@@ -7,7 +7,7 @@ class RemoteProxyModel : public QSortFilterProxyModel
 {
     Q_OBJECT
 public:
-    explicit RemoteProxyModel(QObject *parent = nullptr);\
+    explicit RemoteProxyModel(QObject *parent = nullptr);
 
 
 protected:

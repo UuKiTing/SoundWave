@@ -18,36 +18,57 @@ public:
     explicit UISearch(QWidget *parent = nullptr);
     ~UISearch();
 
-    void showPreviewPanel(); // 显示搜索预览面板
-    void hidePreviewPanel(); // 隐藏搜索预览面板
-    void setModel(QAbstractItemView *view, QAbstractItemModel *model); // 设置模型
+    /** @brief 显示搜索预览面板 */
+    void showPreviewPanel();
 
-    QString searchText(); // 获取搜索栏的文本
-    QAbstractItemView* searchListView(); // 获取搜索列表视图
-    QLineEdit* searchBar(); // 获取搜索栏
+    /** @brief 隐藏搜索预览面板 */
+    void hidePreviewPanel();
+
+    /** @brief 设置模型 */
+    void setModel(QAbstractItemView *view, QAbstractItemModel *model);
+
+    /** @brief 获取搜索栏的文本 */
+    QString searchText();
+
+    /** @brief 获取搜索视图 */
+    QAbstractItemView* searchListView();
+
+    /** @brief 获取搜索栏 */
+    QLineEdit* searchBar();
 
 signals:
-    void songPlayRequest(const QModelIndex &index, bool autoPlay); // 播放歌曲请求信号
+    /** @brief 歌曲播放信号 */
+    void songPlayRequest(const QModelIndex &index, bool autoPlay);
+
+    void flushed();
 
 protected:
+    /** @brief 事件过滤器 */
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 
 private slots:
-    void on_searchBtn_clicked(); // 搜索按钮点击槽函数
+    /** @brief 点击搜索事件 */
+    void on_searchBtn_clicked();
 
-    void on_searchBar_returnPressed(); // 搜索栏回车按下槽函数
+    /** @brief 回车搜索事件 */
+    void on_searchBar_returnPressed();
 
 private:
-    void connectSignal(); // 连接信号和槽
-    void doubleClickPlay(const QModelIndex &index); // 双击播放功能
-    void switchStackedWidget(QString text); // 切换堆叠窗口
+    /** @brief 连接信号和槽 */
+    void connectSignal();
+
+    /** @brief 双击播放 */
+    void doubleClickPlay(const QModelIndex &index);
+
+    /** @brief 搜索预览面板页面切换 */
+    void switchStackedWidget(QString text);
 
     Ui::UISearch *ui;
 
-    SearchPreviewPanel *m_previewPanel{};
+    SearchPreviewPanel *m_previewPanel{}; ///< 搜索预览面板
 
-    SearchBarDelegate *m_delegate{}; // 自定义搜索代理
+    SearchBarDelegate *m_delegate{}; ///< 自定义搜索代理
 };
 
 #endif // UISEARCH_H

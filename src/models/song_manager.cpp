@@ -1,12 +1,12 @@
 #include "song_manager.h"
 #include "image_loader_global.h"
+#include "path_manager.h"
+#include "model_roles.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDir>
 #include <QRandomGenerator>
-#include <taglib/tag.h>
-#include <taglib/fileref.h>
 #include <QCoreApplication>
 #include <QFutureWatcher>
 #include <QtConcurrent>
@@ -15,7 +15,6 @@
 SongManager::SongManager(QObject *parent)
     : QObject{parent}
 {
-
     m_songlistModel = new SongListModel(this);
 
     m_localModel = new LocalProxyModel(this);
@@ -32,102 +31,94 @@ SongManager::SongManager(QObject *parent)
 
     m_playlistModel = new PlayListProxyModel(this);
     m_playlistModel->setSourceModel(m_songlistModel);
-    m_playlistModel->setProperty("proxyId", QVariant::fromValue(ProxyId::SongList));
+    m_playlistModel->setProperty("proxyId", QVariant::fromValue(ProxyId::Playlist));
 
     m_remoteModel = new RemoteProxyModel(this);
     m_remoteModel->setSourceModel(m_songlistModel);
-    m_remoteModel->setProperty("proxyId", QVariant::fromValue(ProxyId::NetWork));
+    m_remoteModel->setProperty("proxyId", QVariant::fromValue(ProxyId::Remote));
 
-    m_playbackState = new SongPlayBackSate(this);
+    m_playbackState = new SongPlaybackState(this);
 
     m_listLoader = new SongListLoader(this);
 
-    loadSongs();    
+    loadSongs();
 }
-
 
 
 void SongManager::loadSongs()
 {
-    m_listLoader->loadSongs(m_songlistModel);
-
+    m_listLoader->loadLocalSongs(m_songlistModel);
     m_listLoader->loadRemoteSongs(m_songlistModel);
-}
 
+    connect(m_listLoader, &SongListLoader::localSongsLoaded, this, [this](){
+        emit songsLoaded();
+    });
 
-void SongManager::generateData()
-{
-    int id = 1;
-    QString currentPath = QCoreApplication::applicationDirPath();
-    QDir dir(QDir(currentPath).filePath("songs"));
-
-
-    for(const QFileInfo &info : dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot)){
-        QJsonObject obj = parseMusic(info.filePath());
-
-        SongInfo song;
-        song.id = id++;
-        song.title = obj["title"].toString();
-        song.artist = obj["artist"].toString();
-        song.duration = obj["duration"].toInt();
-        song.filePath = "songs/" + info.fileName();
-        song.coverPath = "songImage/" + info.baseName() + ".png";
-        song.lyricsPath = "songLyrics/" + info.baseName() + ".lrc";
-
-        DbManager::getInstance().appendMusicData(song);
-    }
-}
-
-
-QJsonObject SongManager::parseMusic(const QString &filePath)
-{
-    // 创建 FileRef 对象（自动识别格式）
-    TagLib::FileRef file(filePath.toStdWString().c_str());
-
-    QJsonObject obj;
-
-    // 检查文件是否有效、是否有标签信息
-    if (!file.isNull() && file.tag()) {
-        TagLib::Tag *tag = file.tag();
-
-        obj["title"] = QString::fromStdWString(tag->title().toWString());
-        obj["artist"] = QString::fromStdWString(tag->artist().toWString());
-        obj["duration"] = file.audioProperties()->lengthInSeconds();
-    }
-
-    return obj;
-}
-
-void SongManager::setCurrentIndex(const QModelIndex &index)
-{
-    m_playbackState->setCurrentIndex(index);
+    connect(m_listLoader, &SongListLoader::remoteSongsLoaded, this, [this](){
+        emit songsLoaded();
+    });
 }
 
 bool SongManager::setPlayingStatus(const QModelIndex &index)
 {
     QModelIndex sourceIndex = this->mapToSource(index);
     if(sourceIndex.isValid()){
-        m_songlistModel->setPlayingStatus(sourceIndex.row());
+        return m_songlistModel->setPlayingStatus(sourceIndex.row());
     }
+    return false;
 }
 
 bool SongManager::setFavorite(const QModelIndex &index, bool isCollect)
 {
+    int song_id = index.data(Roles::Id).toInt();
+
+    bool dbOk = false;
+
+    if(isCollect) dbOk = DbManager::getInstance().collectSong(song_id);
+    else  dbOk = DbManager::getInstance().disCollectSong(song_id);
+
+    if(!dbOk){
+        return false;
+    }
+
+    QPair<int, int> rows = m_songlistModel->value(song_id);
+
+    return m_songlistModel->setFavorite(rows.first, isCollect)
+           && (rows.second >= 0 ? m_songlistModel->setFavorite(rows.second, isCollect) : true);
+}
+
+bool SongManager::setProgress(const QModelIndex &index, int progress)
+{
     QModelIndex sourceIndex = this->mapToSource(index);
     if(sourceIndex.isValid()){
-        m_songlistModel->setFavorite(sourceIndex.row(), isCollect);
+        return m_songlistModel->setProgress(sourceIndex.row(), progress);
     }
+    return false;
 }
 
-QModelIndex SongManager::setNextIndex(bool isNext)
+bool SongManager::setInvalid(const QModelIndex &index)
 {
-    return m_playbackState->setNextIndex(isNext);
+    QModelIndex sourceIndex = this->mapToSource(index);
+    if(sourceIndex.isValid()){
+        return m_songlistModel->setInvalid(sourceIndex.row());
+    }
+    return false;
 }
 
-void SongManager::setMode(PlayMode mode)
+void SongManager::appendSong(const SongInfo &song)
 {
-    m_playbackState->setMode(mode);
-    emit modeChanged(mode);
+    m_songlistModel->addSong(song);
+}
+
+int SongManager::currentRow()
+{
+    return m_playbackState->currentRow();
+}
+
+void SongManager::setPlayMode(PlayMode mode)
+{
+    m_playbackState->setPlayMode(mode);
+    emit playModeChanged(mode);
 }
 
 void SongManager::setListRows(int rows)
@@ -135,25 +126,30 @@ void SongManager::setListRows(int rows)
     m_playbackState->setListRows(rows);
 }
 
-void SongManager::setPlayPage(Page page)
+void SongManager::setProxyId(ProxyId id)
 {
-    m_playbackState->setCurrentPage(page);
+    m_playbackState->setProxyId(id);
 }
 
-void SongManager::setPalylistLastNumber(int number)
+ProxyId SongManager::proxyId()
 {
-    m_playbackState->setPlaylistLastNumber(number);
+    return m_playbackState->proxyId();
+}
+
+void SongManager::setPlaylistPlayingNumber(int number)
+{
+    m_playbackState->setPlaylistPlayingNumber(number);
+}
+
+int SongManager::playlistPlayingNumber()
+{
+    return m_playbackState->playlistPlayingNumber();
 }
 
 void SongManager::changePlayMode()
 {
-    m_playbackState->changeMode();
-    emit modeChanged(m_playbackState->mode());
-}
-
-QAbstractItemModel *SongManager::songlistModel()
-{
-    return m_songlistModel;
+    m_playbackState->changePlayMode();
+    emit playModeChanged(m_playbackState->playMode());
 }
 
 LocalProxyModel *SongManager::localModel()
@@ -181,64 +177,71 @@ RemoteProxyModel *SongManager::remoteModel()
     return m_remoteModel;
 }
 
-SongPlayBackSate *SongManager::playbackState()
+PlayMode SongManager::playMode()
 {
-    return m_playbackState;
-}
-
-
-QModelIndex SongManager::currentIndex()
-{
-    return m_playbackState->currentIndex();
-}
-
-QModelIndex SongManager::sourceIndex(int row)
-{
-    return m_songlistModel->index(row, 0);
-}
-
-int SongManager::currentRow()
-{
-    return m_playbackState->currentRow();
-}
-
-PlayMode SongManager::mode()
-{
-    return m_playbackState->mode();
+    return m_playbackState->playMode();
 }
 
 QSortFilterProxyModel *SongManager::proxyModel(ProxyId id)
 {
     switch (id) {
     case ProxyId::Local:    return m_localModel;
-    case ProxyId::NetWork:  return m_remoteModel;
+    case ProxyId::Remote:  return m_remoteModel;
     case ProxyId::Collect: return m_collectModel;
-    case ProxyId::SongList:   return m_playlistModel;
+    case ProxyId::Playlist:   return m_playlistModel;
     case ProxyId::Search:    return m_searchModel;
     }
 
     return nullptr;
 }
 
-Page SongManager::playPage()
+void SongManager::setPlayPage(MainPage page)
+{
+    m_playbackState->setCurrentPage(page);
+}
+
+MainPage SongManager::playingPage()
 {
     return m_playbackState->currentPage();
 }
 
-Page SongManager::pageOfProxy(ProxyId id)
+MainPage SongManager::pageOfProxyId(ProxyId id)
 {
     switch (id) {
-    case ProxyId::Local:    return Page::Local;
-    case ProxyId::NetWork:  return Page::NetWork;
-    case ProxyId::Collect: return Page::Collect;
-    case ProxyId::SongList:   return Page::PlayList;
-    default: return Page::Local;
+    case ProxyId::Local:    return MainPage::Local;
+    case ProxyId::Remote:  return MainPage::Remote;
+    case ProxyId::Collect: return MainPage::Collect;
+    case ProxyId::Playlist:   return MainPage::PlayList;
+    default: return MainPage::Local;
     }
 }
 
-int SongManager::playlistLastNumber()
+QModelIndex SongManager::currentIndex()
 {
-    return m_playbackState->playlistLastNumber();
+    int row = this->currentRow();
+    ProxyId proxyId = this->proxyId();
+    QSortFilterProxyModel *proxyModel = this->proxyModel(proxyId);
+
+    if(!proxyModel){
+        return QModelIndex();
+    }
+
+    return proxyModel->index(row, 0);
+}
+
+bool SongManager::setCurrentIndex(const QModelIndex &index)
+{
+    if(!index.isValid()) return false;
+
+    m_playbackState->setCurrentRow(index.row());
+
+    return true;
+}
+
+QModelIndex SongManager::setNextIndex(bool isNext)
+{
+    m_playbackState->setNextRow(isNext);
+    return this->currentIndex();
 }
 
 QModelIndex SongManager::mapToSource(const QModelIndex &index)

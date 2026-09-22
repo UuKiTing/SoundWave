@@ -12,25 +12,85 @@ class PlayerController : public QObject
 public:
     explicit PlayerController(QObject *parent = nullptr);
 
-    bool setSource(const QModelIndex &index); // 设置播放源
-    void play(bool autoPlay); // 播放音乐
+    /**
+     * @brief 设置播放源
+     * @param index 模型索引
+     * @return bool 设置成功返回 true, 失败则返回 false
+     */
+    bool setSource(const QModelIndex &index);
 
-    void setPlayProgress(int value); // 设置播放进度
-    void setVolume(int value); // 设置音量
+    /**
+     * @brief 播放歌曲
+     * @param autoPlay true=自动播放, false=不自动播放
+     */
+    void play(bool autoPlay);
 
-    QMediaPlayer* mediaPlayer(); // 返回播放器对象
-    QAudioOutput* audioOutput(); //  返回音频输出对象
-    int volume(); // 返回音量
-    int position(); // 返回当前播放位置
+    /**
+     * @brief 设置歌曲播放进度
+     * @param value 进度值
+     */
+    void setPlayProgress(int value);
+
+    /**
+     * @brief 返回当前播放进去
+     * @return int 进度值
+     */
+    int playProgress();
+
+    /**
+     * @brief 设置音量
+     * @param value 音量值
+     */
+    void setVolume(int value);
+
+    /**
+     * @brief 返回当前音量
+     * @return int 音量值
+     */
+    int volume();
 
 signals:
-    void playbackStarted(bool autoPlay); // 播放开始信号
-    void playbackError(const QString &msg); // 播放错误信号
+    /**
+     * @brief 播放错误信号
+     * @param msg 错误信息
+     */
+    void playbackError(const QString &msg);
+
+    // ========= QMediaPlayer的转发信号 =========
+
+    /** @brief 音量变化信号 */
+    void volumeChanged(float volume);
+
+    /** @brief 播放状态变化信 */
+    void playbackStateChanged(QMediaPlayer::PlaybackState newState);
+
+    /** @brief 媒体状态变化信号 */
+    void mediaStatusChanged(QMediaPlayer::MediaStatus status);
+
+    /** @brief 音频总时长变化信号 */
+    void durationChanged(qint64 duration);
+
+    /** @brief 播放进度变化信号 */
+    void positionChanged(qint64 position);
 
 public slots:
-    void playMusic(const QModelIndex &index,  bool autoPlay); // 播放音乐
-    void playOrPause(); // 自动播放/暂停
-    void skipMusic(const QModelIndex &index); // 上/下一首音乐
+    /**
+     * @brief 播放歌曲
+     * @param index 模型索引
+     * @param autoPlay true=自动播放, false=不自动播放
+     */
+    void playSong(const QModelIndex &index,  bool autoPlay);
+
+    /**
+     * @brief 自动播放与暂停
+     */
+    void playOrPause();
+
+    /**
+     * @brief 上/下一首歌曲
+     * @param index 模型索引
+     */
+    void skipSong(const QModelIndex &index);
 
 private:
     QMediaPlayer *m_player{};

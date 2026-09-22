@@ -5,5 +5,6 @@
         <file>icon/rightClickMenu/next.png</file>
         <file>icon/rightClickMenu/play.png</file>
         <file>icon/rightClickMenu/del.png</file>
+        <file>icon/rightClickMenu/download.png</file>
     </qresource>
 </RCC>

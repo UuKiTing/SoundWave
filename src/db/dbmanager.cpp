@@ -1,5 +1,6 @@
 #include "dbmanager.h"
 #include "logging.h"
+#include "path_manager.h"
 #include <QStandardPaths>
 #include <QSqlRecord>
 #include <QCoreApplication>
@@ -10,14 +11,7 @@
 DbManager::DbManager()
 {
     m_db = QSqlDatabase::addDatabase("QSQLITE");
-
-    // WARNING: 当前数据库放在了程序同级目录，发布前必须迁移到 QStandardPaths 标准路径下
-    QDir dir = QDir(QCoreApplication::applicationDirPath());
-    m_db.setDatabaseName(dir.filePath("music.db"));
-
-    // QString dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    // QDir().mkpath(dbPath);
-    // m_db.setDatabaseName(QDir(dbPath).filePath("music.db"));
+    m_db.setDatabaseName(Paths::databasePath());
 
     if(!m_db.open()){
         qCCritical(dbLog) << "数据库打开失败: " << m_db.lastError().text();
@@ -37,15 +31,15 @@ DbManager::DbManager()
         }
     }
 
+    m_isValid = createSongTable() &&
+                createCollectionTable() &&
+                createPlaylistsTable() &&
+                createPlaylistSongsTable();
 
-    m_isValid = true;
-
-    createSongTable();
-    createCollectionTable();
-    createPlaylistsTable();
-    createPlaylistSongsTable();
+    if(!m_isValid){
+        qCCritical(dbLog) << "数据库初始化失败！";
+    }
 }
-
 
 DbManager &DbManager::getInstance()
 {
@@ -57,11 +51,10 @@ DbManager &DbManager::getInstance()
 QList<SongInfo> DbManager::loadSongs()
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT * FROM songs LEFT JOIN (SELECT music_id FROM collection) as coll "
-                  "ON coll.music_id = songs.id;");
+    query.prepare("SELECT * FROM songs LEFT JOIN (SELECT song_id FROM collection) as coll "
+                  "ON coll.song_id = songs.id;");
 
     if(!query.exec()){
-        qCWarning(dbLog) << "加载歌曲信息失败：" << query.lastError().text();
         return {};
     }
 
@@ -70,17 +63,14 @@ QList<SongInfo> DbManager::loadSongs()
     while(query.next()){
         SongInfo info;
         info.id = query.record().value("id").toInt();
-        info.remoteId = -1;
-        info.source = SongSource::Local;
         info.title = query.record().value("title").toString();
         info.artist = query.record().value("artist").toString();
         info.duration = query.record().value("duration").toInt();
         info.durationString = toDurationString(info.duration);
-        info.filePath = query.record().value("filePath").toString();
-        info.coverPath = query.record().value("cover").toString();
-        info.lyricsPath = query.record().value("lyrics").toString();
-        info.isFavo = !query.record().value("music_id").isNull();
-        info.isPlaying = false;
+        info.audioPath = query.record().value("audio_path").toString();
+        info.coverPath = query.record().value("cover_path").toString();
+        info.lyricsPath = query.record().value("lyrics_path").toString();
+        info.isFavorite = !query.record().value("song_id").isNull();
 
         list.append(info);
     }
@@ -93,29 +83,33 @@ bool DbManager::isValid()
     return m_isValid;
 }
 
-
-bool DbManager::appendMusicData(const SongInfo &info)
+bool DbManager::appendSong(const SongInfo &info)
 {
-    m_db.transaction(); // 开启事务
     QSqlQuery query(m_db);
-    query.prepare("INSERT INTO songs VALUES(:id, :title, :artist, :duration, :filePath, :cover, :lyrics)");
+    query.prepare("INSERT INTO songs VALUES(:id, :title, :artist, :duration, :audioPath, :coverPath, :lyricsPath)");
+
     query.bindValue(":id", info.id);
     query.bindValue(":title", info.title);
     query.bindValue(":artist", info.artist);
     query.bindValue(":duration", info.duration);
-    query.bindValue(":filePath", info.filePath);
-    query.bindValue(":cover", info.coverPath);
-    query.bindValue(":lyrics", info.lyricsPath);
+    query.bindValue(":audioPath", info.audioPath);
+    query.bindValue(":coverPath", info.coverPath);
+    query.bindValue(":lyricsPath", info.lyricsPath);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "插入数据到歌曲表中失败：" << query.lastError().text();
         return false;
     }
 
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
+    return true;
+}
+
+bool DbManager::removeSong(int song_id)
+{
+    QSqlQuery query(m_db);
+    query.prepare("DELETE FROM songs WHERE id = :song_id");
+    query.bindValue(":song_id", song_id);
+
+    if(!query.exec()){
         return false;
     }
 
@@ -124,20 +118,12 @@ bool DbManager::appendMusicData(const SongInfo &info)
 
 bool DbManager::collectSong(int song_id)
 {
-    m_db.transaction(); // 开启事务
     QSqlQuery query(m_db);
-    query.prepare("INSERT INTO collection (music_id)VALUES(:music_id)");
-    query.bindValue(":music_id", song_id);
+    query.prepare("INSERT INTO collection (song_id)VALUES(:song_id)");
+
+    query.bindValue(":song_id", song_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "收藏失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
@@ -146,33 +132,23 @@ bool DbManager::collectSong(int song_id)
 
 bool DbManager::disCollectSong(int song_id)
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
-    query.prepare("DELETE FROM collection WHERE music_id = :music_id");
-    query.bindValue(":music_id", song_id);
+    query.prepare("DELETE FROM collection WHERE song_id = :song_id");
+    query.bindValue(":song_id", song_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "取消收藏失败：" << query.lastError().text();
         return false;
     }
 
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
-        return false;
-    }
     return true;
 }
 
-QList<int> DbManager::queryColletSongs()
+QList<int> DbManager::queryCollectSongs()
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
-    query.prepare("SELECT music_id FROM collection");
+    query.prepare("SELECT song_id FROM collection");
 
     if(!query.exec()){
-        qCWarning(dbLog) << "查找收藏歌曲失败：" << query.lastError().text();
         return {};
     }
 
@@ -183,9 +159,8 @@ QList<int> DbManager::queryColletSongs()
     return list;
 }
 
-PlayListInfo DbManager::createPlaylist(int user_id, const QString &name)
+PlayListInfo DbManager::createPlaylist(const QString &name)
 {
-    m_db.transaction(); // 开启事务
     QSqlQuery query(m_db);
 
     query.prepare("INSERT INTO playlists (name, cover_path) VALUES(:name, :cover_path);");
@@ -193,18 +168,10 @@ PlayListInfo DbManager::createPlaylist(int user_id, const QString &name)
     query.bindValue(":cover_path", ":/icon/cover.png");
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "创建歌单失败：" << query.lastError().text();
         return {};
     }
 
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
-        return {};
-    }
-
-    return queryOneOfPlaylists(user_id, name);
+    return queryOneOfPlaylists(name);
 }
 
 QList<PlayListInfo> DbManager::queryPlaylists()
@@ -212,19 +179,19 @@ QList<PlayListInfo> DbManager::queryPlaylists()
     QSqlQuery query(m_db);
     query.prepare("SELECT * FROM playlists");
 
+    QList<PlayListInfo> list;
+
     if(!query.exec()){
-        qCWarning(dbLog) << "查询所有歌单失败：" << query.lastError().text();
-        return {};
+        return list;
     }
 
-    QList<PlayListInfo> list;
 
     while(query.next()){
         PlayListInfo info;
 
-        info.id = query.record().value("id").toInt();
-        info.name = query.record().value("name").toString();
-        info.cover = query.record().value("cover_path").toString();
+        info.id = query.value("id").toInt();
+        info.name = query.value("name").toString();
+        info.coverPath = query.value("cover_path").toString();
 
         list.append(info);
     }
@@ -232,16 +199,15 @@ QList<PlayListInfo> DbManager::queryPlaylists()
     return list;
 }
 
-PlayListInfo DbManager::queryOneOfPlaylists(int user_id, const QString &name)
+PlayListInfo DbManager::queryOneOfPlaylists(const QString &name)
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT * FROM playlists WHERE name = :name;");
+    query.prepare("SELECT id, name, cover_path FROM playlists WHERE name = :name;");
     query.bindValue(":name", name);
 
     PlayListInfo info;
 
     if(!query.exec()){
-        qCWarning(dbLog) << "歌单查找失败：" << query.lastError().text();
         return info;
     }
 
@@ -249,7 +215,7 @@ PlayListInfo DbManager::queryOneOfPlaylists(int user_id, const QString &name)
 
     info.id = query.record().value("id").toInt();
     info.name = query.record().value("name").toString();
-    info.cover = query.record().value("cover_path").toString();
+    info.coverPath = query.record().value("cover_path").toString();
 
     return info;
 }
@@ -258,7 +224,7 @@ QSet<int> DbManager::queryPlaylistId(int playlist_id)
 {
     QSqlQuery query(m_db);
     query.prepare(R"(
-        SELECT * FROM playlist_songs  WHERE playlist_id = :playlist_id ORDER BY sort_order DESC
+        SELECT song_id FROM playlist_songs  WHERE playlist_id = :playlist_id ORDER BY sort_order DESC
 )");
 
     query.bindValue(":playlist_id", playlist_id);
@@ -266,67 +232,48 @@ QSet<int> DbManager::queryPlaylistId(int playlist_id)
     QSet<int> set;
 
     if(!query.exec()){
-        qCWarning(dbLog) << "查询歌单列表id失败：" << query.lastError().text();
         return {};
     }
 
     while(query.next())
-        set.insert(query.record().value("id").toInt());
+        set.insert(query.record().value("song_id").toInt());
 
     return set;
 }
 
 bool DbManager::insertSongToPlaylist(int palylist_id, int song_id)
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
     query.prepare(R"(
-    INSERT INTO playlist_songs (playlist_id, song_id, sort_order)
-    VALUES (
-        :playlist_id,
-        :song_id,
-        COALESCE((SELECT MAX(sort_order) FROM playlist_songs WHERE playlist_id = :playlist_id), 0) + 1
-    );
-)");
+        INSERT INTO playlist_songs (playlist_id, song_id, sort_order)
+        VALUES (
+            :playlist_id,
+            :song_id,
+            COALESCE((SELECT MAX(sort_order) FROM playlist_songs WHERE playlist_id = :playlist_id), 0) + 1
+        );
+    )");
 
     query.bindValue(":playlist_id", palylist_id);
     query.bindValue(":song_id", song_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "插入歌曲到歌单列表中失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
     return true;
 }
 
-bool DbManager::deleteSongToPlaylist(int playlist_id, int song_id)
+bool DbManager::removeSongToPlaylist(int playlist_id, int song_id)
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
     query.prepare(R"(
-    DELETE FROM playlist_songs WHERE playlist_id = :playlist_id AND song_id = :song_id
-)");
+        DELETE FROM playlist_songs WHERE playlist_id = :playlist_id AND song_id = :song_id
+    )");
 
     query.bindValue(":playlist_id", playlist_id);
     query.bindValue(":song_id", song_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "从歌单中删除歌曲中失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
@@ -335,21 +282,12 @@ bool DbManager::deleteSongToPlaylist(int playlist_id, int song_id)
 
 bool DbManager::updatePlaylistCover(const QString &path, int playlist_id)
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
     query.prepare("UPDATE playlists SET cover_path = :cover_path WHERE id = :playlist_id;");
     query.bindValue(":cover_path", path);
     query.bindValue(":playlist_id", playlist_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "更新歌单封面失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
@@ -361,15 +299,13 @@ int DbManager::songCountInPlaylist(int playlist_id)
     QSqlQuery query(m_db);
     query.prepare(R"(
         SELECT count(*)
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        WHERE ps.playlist_id = :playlist_id;
+        FROM playlist_songs
+        WHERE playlist_id = :playlist_id
 )");
 
     query.bindValue(":playlist_id", playlist_id);
 
     if(!query.exec()){
-        qCWarning(dbLog) << "查询歌单歌曲数量失败:" << query.lastError().text();
         return -1;
     }
 
@@ -378,20 +314,11 @@ int DbManager::songCountInPlaylist(int playlist_id)
 
 bool DbManager::deletePlaylist(int playlist_id)
 {
-    m_db.transaction();
     QSqlQuery query(m_db);
     query.prepare("DELETE FROM playlists WHERE id = :playlist_id;");
     query.bindValue(":playlist_id", playlist_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "删除歌单失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
@@ -400,21 +327,13 @@ bool DbManager::deletePlaylist(int playlist_id)
 
 bool DbManager::updatePlaylistName(const QString &name, int playlist_id)
 {
-    m_db.transaction();
+
     QSqlQuery query(m_db);
     query.prepare("UPDATE playlists SET name = :name WHERE id = :playlist_id;");
     query.bindValue(":name", name);
     query.bindValue(":playlist_id", playlist_id);
 
     if(!query.exec()){
-        m_db.rollback();
-        qCWarning(dbLog) << "更新歌单封面失败：" << query.lastError().text();
-        return false;
-    }
-
-    if(!m_db.commit()){
-        m_db.rollback();
-        qCWarning(dbLog) << "事务提交失败：" << query.lastError().text();
         return false;
     }
 
@@ -433,7 +352,6 @@ QSet<int> DbManager::findPlaylistsBySong(int song_id)
     QSet<int> set;
 
     if(!query.exec()){
-        qCWarning(dbLog) << "查询歌曲所在的歌单有哪些失败！" << query.lastError().text();
         return {};
     }
 
@@ -444,7 +362,7 @@ QSet<int> DbManager::findPlaylistsBySong(int song_id)
     return set;
 }
 
-void DbManager::createSongTable()
+bool DbManager::createSongTable()
 {
     QSqlQuery query(m_db);
     QString sql = R"(
@@ -453,36 +371,38 @@ void DbManager::createSongTable()
             title TEXT,
             artist TEXT,
             duration INTEGER,
-            filePath TEXT,
-            cover TEXT,
-            lyrics text
+            audio_path TEXT,
+            cover_path TEXT,
+            lyrics_path text
             );
     )";
 
     if(!query.exec(sql)){
-        qCWarning(dbLog) << "创建 songs 表失败:" << query.lastError().text();
-        return;
+        return false;
     }
+
+    return true;
 }
 
-void DbManager::createCollectionTable()
+bool DbManager::createCollectionTable()
 {
     QSqlQuery query(m_db);
     QString sql = R"(
         CREATE TABLE IF NOT EXISTS collection (
             id INTEGER PRIMARY KEY,
-            music_id INTEGER NOT NULL UNIQUE
+            song_id INTEGER NOT NULL UNIQUE
             );
     )";
 
 
     if(!query.exec(sql)){
-        qCWarning(dbLog) << "创建 collection 表失败:" << query.lastError().text();
-        return;
+        return false;
     }
+
+    return true;
 }
 
-void DbManager::createPlaylistsTable()
+bool DbManager::createPlaylistsTable()
 {
     QSqlQuery query(m_db);
     QString sql = R"(
@@ -496,12 +416,13 @@ void DbManager::createPlaylistsTable()
 
 
     if(!query.exec(sql)){
-        qCWarning(dbLog) << "创建 playlists 表失败:" << query.lastError().text();
-        return;
+        return false;
     }
+
+    return true;
 }
 
-void DbManager::createPlaylistSongsTable()
+bool DbManager::createPlaylistSongsTable()
 {
     QSqlQuery query(m_db);
     QString sql = R"(
@@ -516,9 +437,10 @@ void DbManager::createPlaylistSongsTable()
     )";
 
     if(!query.exec(sql)){
-        qCWarning(dbLog) << "创建 playlist_songs 表失败:" << query.lastError().text();
-        return;
+        return false;
     }
+
+    return true;
 }
 
 
@@ -528,4 +450,3 @@ DbManager::~DbManager()
         m_db.close();
     }
 }
-

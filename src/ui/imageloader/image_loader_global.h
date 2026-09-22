@@ -10,14 +10,17 @@ class ImageLoaderGlobal : public QObject
 {
     Q_OBJECT
 public:
-    ImageLoaderGlobal(const ImageLoaderGlobal&&) = delete;
-    ImageLoaderGlobal operator=(const ImageLoaderGlobal&&) = delete;
+    ImageLoaderGlobal(const ImageLoaderGlobal&) = delete;
+    ImageLoaderGlobal& operator=(const ImageLoaderGlobal&) = delete;
+    ImageLoaderGlobal(ImageLoaderGlobal&&) = delete;
+    ImageLoaderGlobal& operator=(ImageLoaderGlobal&&) = delete;
 
     static ImageLoaderGlobal& getInstance();
 
-    const ImageLoader* loader() const;
-
     void addTask(const ImageTask &task);
+
+signals:
+    void imageLoaded(int song_id, const QString &path, QVariant var);
 
 private:
     ImageLoaderGlobal();

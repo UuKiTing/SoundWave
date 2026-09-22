@@ -1,5 +1,5 @@
-#ifndef SONG_LIST_PROXY_MODEL_H
-#define SONG_LIST_PROXY_MODEL_H
+#ifndef PLAYLIST_PROXY_MODEL_H
+#define PLAYLIST_PROXY_MODEL_H
 
 #include <QObject>
 #include <QSortFilterProxyModel>
@@ -16,7 +16,7 @@ public:
 private:
     QSet<int> m_allowedSongIds{};
 
-    QSet<int> m_visiableRows{};
+    QSet<int> m_visibleRows{};
 };
 
-#endif // SONG_LIST_PROXY_MODEL_H
+#endif // PLAYLIST_PROXY_MODEL_H

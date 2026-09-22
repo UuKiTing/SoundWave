@@ -1,6 +1,6 @@
+#include "page.h"
 #include "uisearch.h"
 #include "ui_uisearch.h"
-#include "global.h"
 #include "contextmenu.h"
 #include <QTimer>
 #include <QMouseEvent>
@@ -20,7 +20,7 @@ UISearch::UISearch(QWidget *parent)
 
     connectSignal();
 
-    window()->installEventFilter(this); // 安装事件过滤器到顶层窗口，以便在点击其他地方时隐藏预览面板
+    window()->installEventFilter(this); // 安装事件过滤器
 }
 
 UISearch::~UISearch()
@@ -34,7 +34,7 @@ void UISearch::connectSignal()
     connect(m_previewPanel->searchListView(), &QListView::doubleClicked, this, &UISearch::doubleClickPlay);
 
     // 搜索栏文本变化事件
-    connect(ui->searchBar, &QLineEdit::textChanged, this, &UISearch::switchStackedWidget);
+    // connect(ui->searchBar, &QLineEdit::textChanged, this, &UISearch::switchStackedWidget);
 }
 
 void UISearch::doubleClickPlay(const QModelIndex &index)
@@ -51,8 +51,9 @@ void UISearch::doubleClickPlay(const QModelIndex &index)
 
 void UISearch::switchStackedWidget(QString text)
 {
-    if(text.isEmpty()) m_previewPanel->switchStackedWidget(SearchPage::Main); // 如果搜索栏为空，则切换到搜索列表主界面
-    else m_previewPanel->switchStackedWidget(SearchPage::Search); // 如果搜索栏不为空，则切换到搜索列表的结果页面
+    if(!text.isEmpty()){
+        m_previewPanel->switchStackedWidget(SearchPage::Search);
+    }
 }
 
 QString UISearch::searchText()
@@ -67,10 +68,10 @@ QAbstractItemView *UISearch::searchListView()
 
 void UISearch::showPreviewPanel()
 {
-    QPoint globalPos = ui->searchBar->mapToGlobal(QPoint(0, ui->searchBar->height())); // 计算搜索列表的位置
-    m_previewPanel->move(globalPos); // 将搜索列表移动到搜索栏下方
-    m_previewPanel->resize(ui->searchBar->width(), 200); // 设置搜索列表的宽度和高度
-    m_previewPanel->show(); // 显示搜索列表
+    QPoint globalPos = ui->searchBar->mapToGlobal(QPoint(0, ui->searchBar->height())); // 计算搜索栏的位置
+    m_previewPanel->move(globalPos);
+    m_previewPanel->resize(ui->searchBar->width(), 200);
+    m_previewPanel->show();
 }
 
 void UISearch::hidePreviewPanel()
@@ -90,9 +91,9 @@ QLineEdit *UISearch::searchBar()
     return ui->searchBar;
 }
 
-
 void UISearch::on_searchBtn_clicked()
 {
+
 }
 
 
@@ -104,7 +105,7 @@ void UISearch::on_searchBar_returnPressed()
 bool UISearch::eventFilter(QObject *watched, QEvent *event)
 {
     if(watched == ui->searchBar){ // 如果事件源是搜索栏
-        if(event->type() == QEvent::FocusIn){ // 当搜索栏获得焦点时，显示预览面板
+        if(event->type() == QEvent::FocusIn){ // 当搜索栏获得焦点时，显示搜索预览面板
             showPreviewPanel();
         }
         else if(event->type() == QEvent::FocusOut){
@@ -115,7 +116,6 @@ bool UISearch::eventFilter(QObject *watched, QEvent *event)
             hidePreviewPanel();
         }
     }
-
 
     if (event->type() == QEvent::MouseButtonPress && m_previewPanel && m_previewPanel->isVisible()) {
         if (!ui->searchBar->underMouse() && !m_previewPanel->underMouse()) {

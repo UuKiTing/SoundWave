@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qss/volume_slider.qss</file>
+        <file>qss/song_detail_listview.qss</file>
+        <file>qss/scroll_style.qss</file>
+    </qresource>
+</RCC>

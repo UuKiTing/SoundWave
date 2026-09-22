@@ -1,5 +1,5 @@
 #include "player_controller.h"
-#include "global.h"
+#include "model_roles.h"
 #include "logging.h"
 #include <QFile>
 
@@ -18,20 +18,19 @@ PlayerController::PlayerController(QObject *parent)
         emit playbackError(m_player->errorString());
     });
 
+    connect(m_audioOutput, &QAudioOutput::volumeChanged, this, &PlayerController::volumeChanged);
+
+    // 将QMediaPlayer的信号转发出去
+    connect(m_player, &QMediaPlayer::playbackStateChanged, this, &PlayerController::playbackStateChanged);
+    connect(m_player, &QMediaPlayer::mediaStatusChanged, this, &PlayerController::mediaStatusChanged);
+    connect(m_player, &QMediaPlayer::durationChanged, this, &PlayerController::durationChanged);
+    connect(m_player, &QMediaPlayer::positionChanged, this, &PlayerController::positionChanged);
 }
 
 bool PlayerController::setSource(const QModelIndex &index)
 {
-    // QString filePath = index.data(Roles::FilePath).toString();
-    // if(!QFile::exists(filePath)){
-    //     qCWarning(playerLog) << "音频文件不存在:" << filePath;
-    //     return false;
-    // }
+    QString filePath = index.data(Roles::AudioPath).toString();
 
-    // m_player->setSource(QUrl::fromLocalFile(filePath));
-    // return true;
-
-    QString filePath = index.data(Roles::FilePath).toString();
     if(filePath.isEmpty()){
         qCWarning(playerLog) << "音频路径为空!";
         return false;
@@ -39,12 +38,13 @@ bool PlayerController::setSource(const QModelIndex &index)
 
     QUrl url;
 
+    // 如果是http地址
     if (filePath.startsWith("http://", Qt::CaseInsensitive) ||
         filePath.startsWith("https://", Qt::CaseInsensitive)) {
 
         url  = QUrl::fromUserInput(filePath);
     }
-    else{
+    else{ // 如果是本地路径
         if(!QFile::exists(filePath)){
             qCWarning(playerLog) << "音频文件不存在:" << filePath;
             return false;
@@ -54,6 +54,7 @@ bool PlayerController::setSource(const QModelIndex &index)
     }
 
     m_player->setSource(url);
+
     return true;
 }
 
@@ -67,19 +68,14 @@ void PlayerController::setPlayProgress(int value)
     m_player->setPosition(value);
 }
 
+int PlayerController::playProgress()
+{
+    return m_player->position();
+}
+
 void PlayerController::setVolume(int value)
 {
     m_audioOutput->setVolume(value / 100.0);
-}
-
-QMediaPlayer *PlayerController::mediaPlayer()
-{
-    return m_player;
-}
-
-QAudioOutput *PlayerController::audioOutput()
-{
-    return m_audioOutput;
 }
 
 int PlayerController::volume()
@@ -87,38 +83,33 @@ int PlayerController::volume()
     return static_cast<int>(m_audioOutput->volume() * 100);
 }
 
-int PlayerController::position()
+void PlayerController::playSong(const QModelIndex &index, bool autoPlay)
 {
-    return m_player->position();
-}
-
-void PlayerController::playMusic(const QModelIndex &index, bool autoPlay)
-{
-    if(!this->setSource(index)){ // 设置播放源
+    if(!this->setSource(index)){
         emit playbackError("无法播放：音频文件不在！");
         return;
     }
 
-    this->play(autoPlay); // 播放音乐
+    this->play(autoPlay);
 }
 
 void PlayerController::playOrPause()
 {
+    // 如果处于播放状态则暂停
     if (m_player->playbackState() == QMediaPlayer::PlayingState) {
         m_player->pause();
-    }
-    else {
-        // PausedState 和 StoppedState
-        if (m_player->mediaStatus() >= QMediaPlayer::LoadedMedia) m_player->play();
-        else qCInfo(playerLog) << "媒体正在加载中，请稍候...";
+    } // 如果处于暂停或者停止状态则播放
+    else if(m_player->playbackState() == QMediaPlayer::PausedState ||
+            m_player->playbackState() == QMediaPlayer::StoppedState){
+        m_player->play();
     }
 }
 
-void PlayerController::skipMusic(const QModelIndex &index)
+void PlayerController::skipSong(const QModelIndex &index)
 {
 
-    if(this->setSource(index)){ // 设置播放源
-        this->play(true); // 自动播放音乐
+    if(this->setSource(index)){
+        this->play(true);
     }
     else{
         qDebug(playerLog) << "设置播放源失败";

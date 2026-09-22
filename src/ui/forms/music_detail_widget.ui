@@ -181,7 +181,7 @@
                <string notr="true"/>
               </property>
               <property name="pixmap">
-               <pixmap resource="../../../resources/images.qrc">:/images/avatar.png</pixmap>
+               <pixmap resource="../../../resources/icon.qrc">:/icon/cover.png</pixmap>
               </property>
               <property name="scaledContents">
                <bool>true</bool>
@@ -261,7 +261,7 @@
                <string notr="true">color: rgb(0, 0, 0);</string>
               </property>
               <property name="text">
-               <string>StarBoy</string>
+               <string/>
               </property>
               <property name="alignment">
                <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
@@ -286,7 +286,7 @@
                <string notr="true">color: rgb(139, 139, 139);</string>
               </property>
               <property name="text">
-               <string>The Weeknd</string>
+               <string/>
               </property>
               <property name="alignment">
                <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
@@ -383,7 +383,7 @@
   </layout>
  </widget>
  <resources>
-  <include location="../../../resources/images.qrc"/>
+  <include location="../../../resources/icon.qrc"/>
  </resources>
  <connections/>
 </ui>

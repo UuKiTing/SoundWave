@@ -25,5 +25,6 @@ bool CoverCacheManager::insert(const QString &key, QImage *image, int cost)
 
 bool CoverCacheManager::contains(const QString &key)
 {
+    QMutexLocker locker(&m_mutex);
     return m_coverCache.contains(key);
 }

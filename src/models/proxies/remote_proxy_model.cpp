@@ -1,5 +1,8 @@
 #include "remote_proxy_model.h"
-#include "global.h"
+#include "model_roles.h"
+#include "song_info.h"
+#include <QThread>
+#include <QApplication>
 
 RemoteProxyModel::RemoteProxyModel(QObject *parent)
     : QSortFilterProxyModel{parent}

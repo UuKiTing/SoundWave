@@ -28,5 +28,8 @@
         <file>icon/setting.png</file>
         <file>icon/local.png</file>
         <file>icon/remote.png</file>
+        <file>icon/timing.png</file>
+        <file>icon/close.png</file>
+        <file>icon/open.png</file>
     </qresource>
 </RCC>

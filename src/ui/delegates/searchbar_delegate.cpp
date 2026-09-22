@@ -1,5 +1,6 @@
 #include "searchbar_delegate.h"
-#include "global.h"
+#include "model_roles.h"
+#include "song_info.h"
 #include <QPainter>
 
 SearchBarDelegate::SearchBarDelegate(QObject *parent)
@@ -29,6 +30,16 @@ void SearchBarDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
     painter->setFont(font);
     painter->setPen(Qt::black);
     painter->drawText(15, option.rect.top() + 20, title + "-" + artist);
+    painter->restore();
+
+    painter->save();
+    SongSource source = index.data(Roles::Source).value<SongSource>();
+    QIcon markIcon = (source == SongSource::Local) ? QIcon("://icon/local.png") : QIcon(":/icon/remote.png");
+    int IconSize = 15;
+    QRect markRect = QRect(option.rect.right() - 30,
+                           option.rect.center().y() - IconSize / 2,
+                           IconSize, IconSize);
+    markIcon.paint(painter, markRect);
     painter->restore();
 
     QStyledItemDelegate::paint(painter, option, index);

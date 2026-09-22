@@ -1,0 +1,13 @@
+QListWidget {
+   background-color: transparent;
+   border: none;
+   font-size: 22px;
+}
+QListWidget::item {
+   color: #A0A0A0;
+}
+QListWidget::item:selected {
+   background-color: transparent;
+   color: rgba(101, 176, 251, 238);
+   font-weight: bold;
+}

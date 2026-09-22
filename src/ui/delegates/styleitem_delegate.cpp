@@ -1,8 +1,9 @@
+#include "model_roles.h"
 #include "styleitem_delegate.h"
-#include "global.h"
 #include "image_loader_global.h"
 #include "coverutils.h"
 #include "song_manager.h"
+#include "image_utils.h"
 #include <QPainter>
 #include <QApplication>
 #include <QMouseEvent>
@@ -14,7 +15,7 @@
 StyleItemDelegate::StyleItemDelegate(QObject *parent)
     : QStyledItemDelegate{parent}
 {
-    connect(ImageLoaderGlobal::getInstance().loader(), &ImageLoader::imageLoaded, this, [this](const QString& path, QVariant var){
+    connect(&ImageLoaderGlobal::getInstance(), &ImageLoaderGlobal::imageLoaded, this, [this](int song_id, const QString& path, QVariant var){
         QSortFilterProxyModel* proxy = var.value<QSortFilterProxyModel*>();
         if(proxy){
             for (int row = 0; row < proxy->rowCount(); ++row) {
@@ -80,6 +81,10 @@ void StyleItemDelegate::textRectsFor(QRect &titleRect, QRect &artistRect, const 
 
 void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
+    if(!option.widget || !option.widget->isVisible()){
+        return;
+    }
+
     const bool isPlaying = index.data(Roles::IsPlaying).toBool();
     const QString title = index.data(Roles::Title).toString();
     const QString artist = index.data(Roles::Artist).toString();
@@ -105,11 +110,13 @@ void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
 
     QSortFilterProxyModel* proxy = qobject_cast<QSortFilterProxyModel*>(const_cast<QAbstractItemModel*>(index.model()));
 
-    CoverUtils::loadCoverAsync(path, QSize(ICON_SIZE, ICON_SIZE), 5,
-                               [painter, &iconRect](const QPixmap& pix){ painter->drawPixmap(iconRect, pix);},
-                               [painter, proxy, &iconRect, &option](){
+    int song_id = index.data(Roles::Id).toInt();
+    CoverUtils::loadCoverAsync(song_id, path, QSize(ICON_SIZE, ICON_SIZE), 5,
+                               [painter, iconRect](const QPixmap& pix){
+                                    painter->drawPixmap(iconRect, pix);
+                                },
+                               [painter, iconRect, &option](){
                                     painter->drawPixmap(iconRect, defaultCover());
-                                    if(!option.widget->isVisible()) return;
                                 },
                                QVariant::fromValue(proxy)
     );
@@ -172,10 +179,40 @@ void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
 
     painter->save();
     SongSource source = index.data(Roles::Source).value<SongSource>();
-    QIcon markIcon = source == SongSource::Local ? QIcon("://icon/local.png") : QIcon(":/icon/remote.png");
+    QIcon markIcon = (source == SongSource::Local) ? QIcon("://icon/local.png") : QIcon(":/icon/remote.png");
     markIcon.paint(painter, markIconRect);
     painter->restore();
 
+
+    int progress = index.data(Roles::ProgressValue).toInt();
+
+    if(progress == -1){
+        return;
+    }
+
+    QRect itemRect = option.rect;
+
+    int barHeight = 3;
+    int margin = 4;
+
+    QRect progressRect(
+        itemRect.left() + margin,
+        itemRect.bottom() - barHeight - margin,
+        itemRect.width() - 2 * margin,
+        barHeight
+        );
+
+    QStyleOptionProgressBar barOption;
+    barOption.initFrom(option.widget);
+    barOption.rect = progressRect;
+    barOption.maximum = 3;
+    barOption.progress = progress;
+    barOption.textVisible = true;
+    barOption.textAlignment = Qt::AlignCenter;
+    barOption.state |= QStyle::State_Horizontal;
+
+    QApplication::style()->drawControl(
+        QStyle::CE_ProgressBar, &barOption, painter, option.widget);
 }
 
 
@@ -194,8 +231,7 @@ bool StyleItemDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, co
         if (btnRect.contains(mouseEvent->pos())) {
             bool isFavo = index.data(Roles::IsFavorite).toBool();
 
-            if(!isFavo) emit collected(index);
-            else emit cancelCollected(index);
+            emit songCollected(!isFavo, index);
 
             return true;
         }

@@ -39,6 +39,7 @@ private:
     void searchConnect(); // 搜索框
     void playlistConnect(); // 歌单
     void detailWidgetConnect(); // 详情页
+    void contextMenuConnect(); // 上下文菜单
 
     void collectSong(bool isCollect, const QModelIndex &index = QModelIndex()); // 收藏音乐
 

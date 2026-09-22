@@ -1,5 +1,6 @@
 #include "collect_proxy_model.h"
-#include "global.h"
+#include "model_roles.h"
+#include "song_info.h"
 #include <QAbstractItemModel>
 
 CollectProxyModel::CollectProxyModel(QObject *parent)

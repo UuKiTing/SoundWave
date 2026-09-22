@@ -26,8 +26,7 @@ public:
     virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const;
 
 signals:
-    void collected(const QModelIndex &index);
-    void cancelCollected(const QModelIndex &index);
+    void songCollected(bool isCollect, const QModelIndex &index);
 
 protected:
     virtual bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index) override;

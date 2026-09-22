@@ -17,6 +17,8 @@ protected:
     bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
 
 private:
+
+    /** @brief 手动刷新模型 */
     void flushVisibleRows();
 
     QSet<int> m_visiableRows;

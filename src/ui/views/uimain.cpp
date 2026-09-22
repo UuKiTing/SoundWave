@@ -6,12 +6,15 @@
 #include "song_manager.h"
 #include "coverutils.h"
 #include "contextmenu.h"
+#include "model_roles.h"
+#include "image_utils.h"
+#include "stylesheetutils.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QWidgetAction>
 #include <QMenu>
 #include <QLabel>
-
+#include <QFile>
 
 UIMain::UIMain(QWidget *parent)
     : QWidget(parent)
@@ -21,20 +24,23 @@ UIMain::UIMain(QWidget *parent)
 
     // 设置委托
     m_delegate = new StyleItemDelegate(this);
-    ui->listView->setItemDelegate(m_delegate);
+    ui->localListView->setItemDelegate(m_delegate);
     ui->collectListView->setItemDelegate(m_delegate);
-    ui->songListView->setItemDelegate(m_delegate);
+    ui->playlistView->setItemDelegate(m_delegate);
     ui->remoteListView->setItemDelegate(m_delegate);
 
     // 设置列表视图的右键菜单策略
-    ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->localListView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->collectListView->setContextMenuPolicy(Qt::CustomContextMenu);
-    ui->songListView->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->playlistView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->remoteListView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-    initVolumeMenu(); // 初始化音量菜单
+    initVolumeMenu();
 
-    connectSignal(); // 连接信号槽
+    connectSignal();
+
+    QString styleSheet = StyleSheetUtils::loadStyleSheet("://qss/scroll_style.qss");
+    qApp->setStyleSheet(styleSheet);
 }
 
 
@@ -45,41 +51,40 @@ UIMain::~UIMain()
 
 void UIMain::connectSignal()
 {
-    // 连接委托的收藏信号到UIMain的收藏槽函数
-    connect(m_delegate, &StyleItemDelegate::collected, this, &UIMain::collected);
-    connect(m_delegate, &StyleItemDelegate::cancelCollected, this, &UIMain::cancelCollected);
+    connect(m_delegate, &StyleItemDelegate::songCollected, this, &UIMain::songCollected);
 
-    // 显示主页歌曲列表的右键菜单
-    auto& contextMenu =  ContextMenu::getInstance();
-    connect(ui->listView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
-         contextMenu.show(ui->listView, pos);
+    connect(ui->localListView, &QListView::customContextMenuRequested, this, [this](const QPoint &pos){
+         ContextMenu::getInstance().show(ui->localListView, pos);
     });
-    connect(ui->collectListView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
-         contextMenu.show(ui->collectListView, pos);
+    connect(ui->collectListView, &QListView::customContextMenuRequested, this, [this](const QPoint &pos){
+         ContextMenu::getInstance().show(ui->collectListView, pos);
     });
-    connect(ui->songListView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
-         contextMenu.show(ui->songListView, pos);
+    connect(ui->playlistView, &QListView::customContextMenuRequested, this, [this](const QPoint &pos){
+         ContextMenu::getInstance().show(ui->playlistView, pos);
     });
-    connect(ui->remoteListView, &QListView::customContextMenuRequested, this, [this, &contextMenu](const QPoint &pos){
-        contextMenu.show(ui->remoteListView, pos);
+    connect(ui->remoteListView, &QListView::customContextMenuRequested, this, [this](const QPoint &pos){
+        ContextMenu::getInstance().show(ui->remoteListView, pos);
     });
 
+    connect(&ContextMenu::getInstance(), &ContextMenu::songlistCoverUpdated, this, &UIMain::setSonglistCover);
 
-    connect(&contextMenu, &ContextMenu::songlistCoverUpdated, this, &UIMain::setSonglistCover);
-
-    connect(ImageLoaderGlobal::getInstance().loader(), &ImageLoader::imageLoaded, this, [this](const QString& path, QVariant var){
+    auto &imageLoaderGlobal = ImageLoaderGlobal::getInstance();
+    connect(&imageLoaderGlobal, &ImageLoaderGlobal::imageLoaded, this, [this](int song_id, const QString& path, QVariant var){
         QString str = var.toString();
         if(str == "UIMain::setSonglistCover"){
-            this->setSonglistCover(path);
+            this->setSonglistCover(song_id, path);
         }
     });
 
-    connect(ImageLoaderGlobal::getInstance().loader(), &ImageLoader::imageLoaded, this, [this](const QString &path, QVariant var){
+    connect(&imageLoaderGlobal, &ImageLoaderGlobal::imageLoaded, this, [this](int song_id, const QString &path, QVariant var){
         QString str = var.toString();
         if(str == "UIMain::setCoverIcon"){
-            this->setCoverIcon(path);
+            this->setCoverIcon(song_id, path);
         }
     });
+
+    connect(ui->progressSlider, &QSlider::sliderPressed, this, &UIMain::sliderPressed);
+    connect(ui->progressSlider, &QSlider::sliderReleased, this, &UIMain::sliderReleased);
 }
 
 
@@ -90,36 +95,21 @@ void UIMain::initVolumeMenu()
     m_volumeSlider = new QSlider(Qt::Vertical);
     m_volumeSlider->setRange(0, 100);
 
-    //TODO: StyleSheet可以抽象成.qss文件
-    m_volumeMenu->setStyleSheet(R"(
-        QSlider {
-            background-color: transparent;
-        }
-
-        QSlider::groove:vertical {
-            background: #E3F2FD;
-            width: 4px;
-        }
-
-        QSlider::add-page:vertical {
-            background: #64B5F6;
-            width: 4px;
-        }
-
-        QSlider::handle:vertical {
-            background: #FFFFFF;
-            height: 10px;
-            width: 15px;
-            border-radius: 5px;
-            margin: 0 -6px;
-            border: 1px solid #64B5F6;
-        })");
-
+    QString styleSheet = StyleSheetUtils::loadStyleSheet("://qss/volume_slider.qss");
+    m_volumeMenu->setStyleSheet(styleSheet);
 
     QWidgetAction *action = new QWidgetAction(m_volumeMenu);
     action->setDefaultWidget(m_volumeSlider);
 
     m_volumeMenu->addAction(action);
+}
+
+void UIMain::playSonglist(QAbstractItemModel *model)
+{
+    if(model && model->rowCount() >  0){
+        QModelIndex index = model->index(0, 0);
+        this->doubleClickPlay(index, true);
+    }
 }
 
 
@@ -128,8 +118,9 @@ void UIMain::setPlayStyle(const QModelIndex &index)
     if(!index.isValid()) return;
 
     this->setTotalDuration(toDurationString(index.data(Roles::Duration).toInt())); // 设置最大时长
-    this->setCoverIcon(index.data(Roles::CoverPath).toString());  // 设置音乐封面
-    this->setTitleAndArtist(index.data(Roles::Title).toString(), // 设置音乐名称和作者
+    this->setCoverIcon(index.data(Roles::Id).toInt(), // 设置歌曲封面
+                       index.data(Roles::CoverPath).toString());
+    this->setTitleAndArtist(index.data(Roles::Title).toString(), // 设置歌曲名称和作者
                             index.data(Roles::Artist).toString());
 
     if(index.data(Roles::IsFavorite).toBool()){ // 设置收藏状态
@@ -144,15 +135,14 @@ void UIMain::setPlayStyle(const QModelIndex &index)
 
 void UIMain::switchStackedWidget(int pageIndex)
 {
-    ui->stackedWidget->setCurrentIndex(pageIndex); // 切换堆叠窗口的页面
+    ui->stackedWidget->setCurrentIndex(pageIndex); // 切换主页面
 }
 
 
 void UIMain::collectStatusToggle(bool checked)
 {
-    collectIconToggle(checked); // 收藏图标切换
-    if(checked) emit collected(); // 发射收藏信号
-    else emit cancelCollected(); // 发射取消收藏信号
+    collectIconToggle(checked);
+    emit songCollected(checked);
 }
 
 
@@ -210,14 +200,13 @@ void UIMain::setProgressValue(qint64 position)
 }
 
 
-void UIMain::setCoverIcon(const QString &path)
+void UIMain::setCoverIcon(int song_id, const QString &path)
 {
-    CoverUtils::loadCoverAsync(path, ui->coverBtn->size(), 5,
+    CoverUtils::loadCoverAsync(song_id, path, ui->coverBtn->size(), 5,
                                [this](const QPixmap& pix){ui->coverBtn->setIcon(pix);},
-                               [this, path](){m_cover = path;},
+                               [this](){ui->coverBtn->setIcon(defaultCover());},
                                 "UIMain::setCoverIcon");
 }
-
 
 void UIMain::setVolumeValue(float volume)
 {
@@ -229,7 +218,10 @@ void UIMain::setTitleAndArtist(const QString &title, const QString &artist)
 {
     QFontMetrics metrics(ui->titleSinger->font());
 
-    QStringList arr = metrics.elidedText(title + "-" + artist, Qt::ElideRight, ui->titleSinger->width()).split("-");
+    QStringList arr = metrics.elidedText(title.split("-")[0] + "-" + artist.split("-")[0],
+                                         Qt::ElideRight, ui->titleSinger->width()
+                                         ).split("-");
+
     QString str = QString("<span vertical-align:middle;'>%1</span>"
                           "<span style='font-size:12px; vertical-align:middle;'> - %2</span>")
                       .arg(arr[0], arr.size() > 1 ? arr[1] : "");
@@ -251,18 +243,18 @@ void UIMain::setPlaylistName(const QString &name)
     ui->playlistName->setText(name);
 }
 
-void UIMain::setSonglistCover(const QString &path)
+void UIMain::setSonglistCover(int song_id, const QString &path)
 {
-    CoverUtils::loadCoverAsync(path, ui->songlistCover->size(), 5,
+    CoverUtils::loadCoverAsync(song_id, path, ui->songlistCover->size(), 5,
                    [this](const QPixmap& pix){ui->songlistCover->setPixmap(pix);},
                    [this](){ui->songlistCover->setPixmap(defaultCover());},
                     "UIMain::setSonglistCover"
                    );
 }
 
-QListView *UIMain::listView()
+QListView *UIMain::localListView()
 {
-    return ui->listView;
+    return ui->localListView;
 }
 
 
@@ -271,9 +263,9 @@ QListView *UIMain::collectListView()
     return ui->collectListView;
 }
 
-QListView *UIMain::songListView()
+QListView *UIMain::playlistView()
 {
-    return ui->songListView;
+    return ui->playlistView;
 }
 
 QListView *UIMain::remoteListView()
@@ -309,7 +301,7 @@ QFrame *UIMain::controlBar()
     return ui->controlBar;
 }
 
-int UIMain::getPlaylistRows(const QAbstractItemModel *model)
+int UIMain::geListRows(const QAbstractItemModel *model)
 {
     if(!model) return -1;
     return model->rowCount();
@@ -326,11 +318,6 @@ QListView *UIMain::currentListView()
     if(listview) return listview;
 
     return nullptr;
-}
-
-QString UIMain::coverPath()
-{
-    return m_cover;
 }
 
 void UIMain::changePlayMode(PlayMode mode)
@@ -351,8 +338,8 @@ void UIMain::doubleClickPlay(const QModelIndex &index, bool autoPlay)
 {
     if (!index.isValid()) return;
 
-    this->setPlayStyle(SongManager::mapToSource(index)); // 设置播放样式
-    emit songPlayed(index, autoPlay); // 发射播放请求信号
+    this->setPlayStyle(SongManager::mapToSource(index));
+    emit songPlayed(index, autoPlay);
 }
 
 void UIMain::skipMusic(bool isNext)
@@ -360,7 +347,7 @@ void UIMain::skipMusic(bool isNext)
     emit songSkipped(isNext);
 }
 
-void UIMain::on_listView_doubleClicked(const QModelIndex &index)
+void UIMain::on_localListView_doubleClicked(const QModelIndex &index)
 {
     this->doubleClickPlay(index, true);
 }
@@ -379,7 +366,7 @@ void UIMain::on_playBtn_clicked()
 
 void UIMain::on_modeBtn_clicked()
 {
-    emit modeChanged();
+    emit playModeChanged();
 }
 
 
@@ -409,15 +396,15 @@ void UIMain::on_loveBtn_clicked(bool checked)
 void UIMain::on_coverBtn_toggled(bool checked)
 {
     if(checked){
-        emit showDetailWidget(true);
+        emit detailWidgetShowed(true);
     }
     else{
-        emit showDetailWidget(false);
+        emit detailWidgetShowed(false);
     }
 }
 
 
-void UIMain::on_songListView_doubleClicked(const QModelIndex &index)
+void UIMain::on_playlistView_doubleClicked(const QModelIndex &index)
 {
     this->doubleClickPlay(index, true);
 }
@@ -425,16 +412,25 @@ void UIMain::on_songListView_doubleClicked(const QModelIndex &index)
 
 void UIMain::on_playlistBtn_clicked()
 {
-    QAbstractItemModel *model = ui->songListView->model();
-    if(model && model->rowCount() >  0){
-        QModelIndex index = model->index(0, 0);
-        this->doubleClickPlay(index, true);
-    }
+    playSonglist(ui->playlistView->model());
 }
 
 
 void UIMain::on_remoteListView_doubleClicked(const QModelIndex &index)
 {
     this->doubleClickPlay(index, true);
+}
+
+
+void UIMain::on_collectlistBtn_clicked()
+{
+    playSonglist(ui->collectListView->model());
+}
+
+
+void UIMain::on_locallistBtn_clicked()
+{
+    playSonglist(ui->localListView->model());
+
 }
 

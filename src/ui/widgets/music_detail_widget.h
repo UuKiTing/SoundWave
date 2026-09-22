@@ -1,6 +1,7 @@
 #ifndef MUSIC_DETAIL_WIDGET_H
 #define MUSIC_DETAIL_WIDGET_H
 
+#include "http_request.h"
 #include <QWidget>
 #include <QList>
 #include <QScrollBar>
@@ -24,18 +25,30 @@ public:
     explicit MusicDetailWidget(QWidget *parent = nullptr);
     ~MusicDetailWidget();
 
-    void flushDetail(const QModelIndex &index); // 刷新歌曲详情
+    /** @brief 刷新歌曲详情页  */
+    void flushDetail(const QModelIndex &index);
 
-    QList<LyricLine> parseLyricFile(const QString &filePath); // 解析歌词文件
+    /** @brief 读取歌词数据 */
+    void getLyricsData(const QString &filePath);
 
-    void showLyrics(const QList<LyricLine> &lyricList); // 显示歌词
+    /** @brief 解析歌词  */
+    QList<LyricLine> parseLyrics(const QByteArray &data);
 
-    int getLyricIndexByTime(const QList<LyricLine> &lyricList, qint64 position); // 根据播放时间获取歌词索引
+    /** @brief 显示歌词  */
+    void showLyrics(const QByteArray &data);
 
-    void setCover(const QString& path);
+    /** @brief 根据播放时间获取歌词索引  */
+    int getLyricIndexByTime(const QList<LyricLine> &lyricList, qint64 position);
+
+    /** @brief 设置歌曲详情页的封面图片  */
+    void setCover(int song_id, const QString& path);
+
+signals:
+    void lyricsDataLoaded(const QByteArray &data);
 
 public slots:
-    void onAudioPositionChanged(qint64 position); // 根据播放时间更新歌词显示
+    /** @brief 根据播放时间更新歌词显示  */
+    void onAudioPositionChanged(qint64 position);
 
 private:
     Ui::MusicDetailWidget *ui;
@@ -45,6 +58,8 @@ private:
     int m_lastLyricIndex = -1;
 
     QPropertyAnimation *m_scrollAnimation{};
+
+    HttpRequest *m_httpRequest; ///< http请求模块
 };
 
 #endif // MUSIC_DETAIL_WIDGET_H

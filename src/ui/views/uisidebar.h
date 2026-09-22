@@ -1,7 +1,8 @@
 #ifndef UISIDEBAR_H
 #define UISIDEBAR_H
 
-#include "global.h"
+#include "playlist_info.h"
+#include "timer.h"
 #include <QWidget>
 #include <QButtonGroup>
 #include <QDialog>
@@ -9,7 +10,8 @@
 
 namespace Ui {
 class UISideBar;
-class Dialog;
+class UiDialog;
+class UITiming;
 }
 
 
@@ -23,52 +25,115 @@ public:
     explicit UISideBar(QWidget *parent = nullptr);
     ~UISideBar();
 
-    QAbstractButton* findPlaylist(int playlist_id); // 查找歌单
-    int findPlaylistOrder(QAbstractButton *btn); // 返回指定歌单按钮的序号
-    QPushButton* findSonglistBtn(int order);
-    QPushButton* getSideBtnOfPage(int page);
-    int playlistNumber();
+    /** @brief 查找歌单 */
+    QAbstractButton* findPlaylist(int playlist_id);
 
-    void updatePlaylistCover(int songlist_id, const QString &path); // 更新歌单封面
-    void setPlaylistCover(const QString& path, QPushButton* btn);
+    /** @brief 返回指定歌单的序号 */
+    int findPlaylistOrder(QAbstractButton *btn);
+
+    /** @brief 根据歌单序号查找歌单按钮 */
+    QPushButton* findSonglistBtn(int order);
+
+    /** @brief 根据主页面类型返回对应按钮 */
+    QPushButton* getSideBtnOfPage(int page);
+
+    /** @brief 返回选择的歌单序号 */
+    int playlistSelectNumber();
+
+    /** @brief 更新歌单封面图片 */
+    void updatePlaylistCover(int songlist_id, int song_id, const QString &path);
+
+    /** @brief 设置歌单封面图片（初始设置） */
+    void setPlaylistCover(int song_id, const QString& path, QAbstractButton* btn);
+
+    /** @brief 设置倒计时的可见性 */
+    void setCountDownVisible(bool visible);
 
 signals:
-    void pageChanged(int pageIndex); // 页面切换信号
-    void playlistClicked(const PlayListInfo &info); // 歌单点击信号
-    void playlistUpdated(const QSet<int> &songIds); // 更新歌单列表内容
-    void playlistCreated(const PlayListInfo &info); // 歌单创建信号
-    void playlistDeleted(int playlist_id); // 歌单删除信号
-    void playlistPlayed(); // 歌单播放信号
-    void playlistNameChanged(const QString& name, int playlist_id); // 歌单名字更改信号
+    /** @brief 页面切换信号 */
+    void pageChanged(int pageIndex);
+
+    /** @brief 歌单点击信号 */
+    void playlistClicked(const PlayListInfo &info);
+
+    /** @brief 刷新歌单列表 */
+    void playlistUpdated(const QSet<int> &songIds);
+
+    /** @brief 歌单创建信号 */
+    void playlistCreated(const PlayListInfo &info);
+
+    /** @brief 歌单删除信号 */
+    void playlistDeleted(int playlist_id);
+
+    /** @brief 歌单播放信号 */
+    void playlistPlayed();
+
+    /** @brief 歌单名字更改信号 */
+    void playlistNameChanged(const QString& name, int playlist_id);
+
+    /** @brief 播放与暂停信号 */
+    void songPlayedOrPaused();
+
 
 private slots:
-    void on_addSongBtn_clicked(); // 添加歌曲按钮点击槽函数
 
-    void on_settingBtn_clicked();
+    /** @brief 添加歌单事件 */
+    void on_addSongBtn_clicked();
+
+    /** @brief 定时事件 */
+    void on_timingBtn_clicked();
 
 private:
-    void connectSignals(); // 连接信号与槽
+    /** @brief 连接信号与槽 */
+    void connectSignals(); //
+
+    /** @brief 初始化侧边栏按钮 */
     void initSideBtn();
-    void initInputDialog();
-    void toggleToLocalPage(bool checked); // 切换到本地页
-    void toggleToCollectPage(bool checked); // 切换到收藏页
-    void toggleToNetworkPage(bool checked); // 切换到联网页
-    void createPlaylist(const PlayListInfo &info); // 创建歌单
-    void initContextMenu(); // 初始化右键菜单
-    void clearInputBox(); // 清空输入框
-    void rightClickPlaylist(QAction *action); // 添加音乐到歌单
+
+    /** @brief  */
+    void initTimingPage();
+
+    /** @brief 切换到本地页面 */
+    void toggleToLocalPage(bool checked);
+
+    /** @brief 切换到收藏页面 */
+    void toggleToCollectPage(bool checked);
+
+    /** @brief 切换到云端页 */
+    void toggleToNetworkPage(bool checked);
+
+    /** @brief 创建歌单 */
+    void createPlaylist(const PlayListInfo &info);
+
+    /** @brief 初始化右键菜单 */
+    void initContextMenu(); //
+
+    /** @brief 清空输入对话框 */
+    void clearInputBox(); //
+
+    /** @brief 点击菜单栏 */
+    void triggerMenu(QAction *action);
+
+    /** @brief 删除歌单 */
     void deletePlaylist(QAbstractButton *btn, int playlist_id);
 
     Ui::UISideBar *ui;
-    Ui::Dialog *m_dialog; // 创建歌单模态框UI对象
+    Ui::UiDialog *ui_dialog; ///< 创建歌单模态框UI对象
+    Ui::UITiming *ui_timing;
 
-    QDialog *m_createSonglistDialog{}; // m_dialog的父窗口，用于显示歌单模态框
+    QDialog *m_dialog{}; ///< ui_dialog的父窗口，用于显示歌单模态框
+    QDialog *m_timingDialog{}; ///< ui_timing的父窗口，用于显示定时模态框
 
-    QButtonGroup *m_group{}; // 按钮组
+    QButtonGroup *m_pageBtnGroup{}; ///< 按钮组
+    QButtonGroup *m_timerCheckBoxGroup{}; ///< 复选框按钮组
 
-    QMenu *m_contextMenu{}; // 右键菜单
+    QMenu *m_contextMenu{}; ///< 右键菜单
 
-    int m_playlistNumber = -1; // 所有歌单中目前哪个是显示状态
+    int m_playlistSelectNumber = -1; ///< 当前选中的歌单序号
+
+    Timer *m_mainTimer;
+    Timer *m_updateTimer;
+
 };
 
 #endif // UISIDEBAR_H

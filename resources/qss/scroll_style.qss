@@ -1,0 +1,36 @@
+/* 垂直滚动条整体 */
+QScrollBar:vertical {
+    width: 4px;
+    background: transparent;
+    margin: 0px;
+}
+
+/* 滑块 */
+QScrollBar::handle:vertical {
+    background: #c0c4cc;
+    border-radius: 4px;
+    min-height: 40px;
+}
+
+/* 滑块悬停 */
+QScrollBar::handle:vertical:hover {
+    background: #909399;
+}
+
+/* 滑块按下 */
+QScrollBar::handle:vertical:pressed {
+    background: #73767a;
+}
+
+/* 隐藏上下箭头按钮 */
+QScrollBar::sub-line:vertical,
+QScrollBar::add-line:vertical {
+    height: 0px;
+    background: none;
+}
+
+/* 轨道空白区域透明 */
+QScrollBar::sub-page:vertical,
+QScrollBar::add-page:vertical {
+    background: none;
+}

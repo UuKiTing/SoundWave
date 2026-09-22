@@ -1,9 +1,12 @@
 #include "music_detail_widget.h"
 #include "ui_music_detail_widget.h"
 #include "coverutils.h"
-#include "global.h"
 #include "logging.h"
 #include "image_loader_global.h"
+#include "model_roles.h"
+#include "image_utils.h"
+#include "stylesheetutils.h"
+#include "path_manager.h"
 #include <QModelIndex>
 #include <QPixmap>
 #include <QFile>
@@ -20,6 +23,8 @@ MusicDetailWidget::MusicDetailWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
+    m_httpRequest = new HttpRequest(this);
+
     m_scrollAnimation = new QPropertyAnimation(
         ui->listWidget->verticalScrollBar(),
         "value",
@@ -28,31 +33,17 @@ MusicDetailWidget::MusicDetailWidget(QWidget *parent)
     m_scrollAnimation->setDuration(200);
     m_scrollAnimation->setEasingCurve(QEasingCurve::Linear);
 
-    ui->listWidget->setStyleSheet(
-        "QListWidget {"
-        "   background-color: transparent;"
-        "   border: none;"
-        "   font-size: 22px;"
-        "}"
+    QString styleSheet = StyleSheetUtils::loadStyleSheet("://qss/song_detail_listview.qss");
+    ui->listWidget->setStyleSheet(styleSheet);
 
-        "QListWidget::item {"
-        "   color: #A0A0A0;"
-        "}"
-
-        "QListWidget::item:selected {"
-        "   background-color: transparent;"
-        "   color: red;"
-        "   font-weight: bold;"
-        "}"
-        );
-
-
-    connect(ImageLoaderGlobal::getInstance().loader(), &ImageLoader::imageLoaded, this, [this](const QString& path, QVariant var){
+    connect(&ImageLoaderGlobal::getInstance(), &ImageLoaderGlobal::imageLoaded, this, [this](int song_id, const QString& path, QVariant var){
         QString str = var.toString();
         if(str == "MusicDetailWidget::setCover"){
-            this->setCover(path);
+            this->setCover(song_id, path);
         }
     });
+
+    connect(this, &MusicDetailWidget::lyricsDataLoaded, this, &MusicDetailWidget::showLyrics);
 }
 
 
@@ -66,31 +57,42 @@ void MusicDetailWidget::flushDetail(const QModelIndex &index)
 {
     ui->listWidget->clear();
 
-    this->setCover(index.data(Roles::CoverPath).toString());
+    this->setCover(index.data(Roles::Id).toInt(), index.data(Roles::CoverPath).toString());
 
     ui->title->setText(index.data(Roles::Title).toString());
     ui->artist->setText(index.data(Roles::Artist).toString());
 
-    m_currentLyrics = parseLyricFile(index.data(Roles::LyricsPath).toString());
-    showLyrics(m_currentLyrics);
+    getLyricsData(index.data(Roles::LyricsPath).toString());
 
     m_lastLyricIndex = -1;
 }
 
-
-QList<LyricLine> MusicDetailWidget::parseLyricFile(const QString &filePath)
+void MusicDetailWidget::getLyricsData(const QString &filePath)
 {
-    QList<LyricLine> lyricList;
+    if (filePath.startsWith("http://", Qt::CaseInsensitive) ||
+        filePath.startsWith("https://", Qt::CaseInsensitive)) {
 
-    QString path = QDir(QCoreApplication::applicationDirPath()).filePath(filePath);
-    QFile file(path);
+        m_httpRequest->get(filePath, [this](QByteArray data){
+            emit lyricsDataLoaded(data);
+        });
+
+        return;
+    }
+
+    QFile file(filePath);
 
     if(!file.open(QIODevice::ReadOnly | QIODevice::Text)){
         qCWarning(uiLog) << "无法打开歌词文件:" << filePath;
-        return lyricList;
+        return;
     }
 
-    QTextStream stream(&file);
+    emit lyricsDataLoaded(file.readAll());
+}
+
+QList<LyricLine> MusicDetailWidget::parseLyrics(const QByteArray &data)
+{
+    QTextStream stream(data);
+    stream.setEncoding(QStringConverter::Utf8);
 
     QRegularExpression timeRegex("\\[(\\d{2}):(\\d{2})\\.(\\d{2})\\]");
 
@@ -133,9 +135,11 @@ QList<LyricLine> MusicDetailWidget::parseLyricFile(const QString &filePath)
 }
 
 
-void MusicDetailWidget::showLyrics(const QList<LyricLine> &lyricList)
+void MusicDetailWidget::showLyrics(const QByteArray &data)
 {
-    for (const LyricLine &item : lyricList) {
+    m_currentLyrics = parseLyrics(data);
+
+    for (const LyricLine &item : m_currentLyrics) {
         ui->listWidget->addItem(item.text);
     }
 }
@@ -161,11 +165,9 @@ int MusicDetailWidget::getLyricIndexByTime(const QList<LyricLine> &lyricList, qi
     return result;
 }
 
-void MusicDetailWidget::setCover(const QString &path)
+void MusicDetailWidget::setCover(int song_id, const QString &path)
 {
-    CoverUtils::loadCoverAsync(path,
-                               QSize(320, 320),
-                               5,
+    CoverUtils::loadCoverAsync(song_id, path, QSize(320, 320), 5,
                                [this](const QPixmap& pix){ui->cover->setPixmap(pix);},
                                [this](){ui->cover->setPixmap(defaultCover());},
                                "MusicDetailWidget::setCover");

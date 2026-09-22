@@ -6,7 +6,11 @@ ImageLoaderGlobal::ImageLoaderGlobal() {
 
     m_loader->moveToThread(m_thread);
 
-    connect(m_thread, &QThread::started, m_loader, &ImageLoader::run);
+    connect(m_loader, &ImageLoader::imageLoaded, this, [this](int song_id, const QString &path, QVariant var){
+        emit imageLoaded(song_id, path, var);
+    });
+
+    connect(m_thread, &QThread::started, m_loader, &ImageLoader::init);
     connect(m_thread, &QThread::finished, m_loader, &QObject::deleteLater);
     connect(m_thread, &QThread::finished, m_thread, &QThread::deleteLater);
 
@@ -18,11 +22,7 @@ ImageLoaderGlobal::~ImageLoaderGlobal()
     if(m_loader) m_loader->stop();
     if(m_thread){
         m_thread->quit();
-        m_thread->wait(3000);
-        if(m_thread->isRunning()){
-            m_thread->terminate();
-            m_thread->wait();
-        }
+        m_thread->wait();
     }
 }
 
@@ -30,11 +30,6 @@ ImageLoaderGlobal &ImageLoaderGlobal::getInstance()
 {
     static ImageLoaderGlobal instance;
     return instance;
-}
-
-const ImageLoader *ImageLoaderGlobal::loader() const
-{
-    return m_loader;
 }
 
 void ImageLoaderGlobal::addTask(const ImageTask& task)
