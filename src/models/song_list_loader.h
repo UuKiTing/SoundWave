@@ -31,7 +31,6 @@ public:
      * @param model 歌曲列表模型
      */
     void loadRemoteSongs(SongListModel *model);
-
 signals:
     void localSongsLoaded();
     void remoteSongsLoaded();
