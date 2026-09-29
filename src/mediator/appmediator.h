@@ -16,6 +16,7 @@ class AppMediator : public QObject
 public:
     explicit AppMediator(QObject *parent = nullptr);
 
+    //TODO: 将AppMediator拆分为PlaybackService LibraryService PlaylistService SearchService
     void connectSignal();
     void setPlayer(PlayerController *controller);
     void setListManager(SongManager *listManager);
