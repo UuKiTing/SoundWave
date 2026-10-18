@@ -57,5 +57,5 @@ src/
 
 ## 注意
 - 云端功能依赖 `BaseUrl` 指向的服务端可用；本地播放不依赖服务端。
-- 如需使用云端功能可自行下载[AudioStreamServer项目](https://github.com)并运行。
+- 如需使用云端功能可自行下载[AudioStreamServer项目](https://github.com/UuKiTing/AudioStreamServer)并运行。
 
