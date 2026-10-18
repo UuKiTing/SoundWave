@@ -16,7 +16,8 @@ public:
     static QString timeToString(int msec);
 
 signals:
-
+    void timerStarted();
+    void finished();
 
 };
 

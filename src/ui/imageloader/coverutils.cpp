@@ -6,20 +6,19 @@
 
 namespace CoverUtils{
 
-bool loadCoverAsync(int song_id, const QString& path, QSize size, int radius,
+bool loadCoverAsync(int cover_id, const QString& path, QSize size, int radius,
                     std::function<void(const QPixmap&)> onLoaded,
-                    std::function<void()> onMissing,
                     QVariant var)
 {
-    QImage* cached = CoverCacheManager::getInstance().get(CoverUtils::makeKey(song_id, size, radius));
+    if(path.isEmpty() || cover_id < 0) return false;
+
+    QImage* cached = CoverCacheManager::getInstance().get(CoverUtils::makeKey(cover_id, size, radius));
     if(cached){
         onLoaded(QPixmap::fromImage(*cached));
         return true;
     }
 
-    ImageLoaderGlobal::getInstance().addTask(ImageTask(song_id, path, var, size, radius));
-
-    onMissing();
+    ImageLoaderGlobal::getInstance().addTask(ImageTask(cover_id, path, var, size, radius));
 
     return false;
 }
@@ -44,11 +43,11 @@ QImage roundImage(const QImage &source, const QSize &size, int radius)
     return result;
 }
 
-QString makeKey(int song_id, const QSize &size, int radius)
+QString makeKey(int cover_id, const QSize &size, int radius)
 {
     QString key;
     key.reserve(40);
-    key += QString::number(song_id);
+    key += QString::number(cover_id);
     key += QChar('_');
     key += QString::number(size.width());
     key += QChar('_');

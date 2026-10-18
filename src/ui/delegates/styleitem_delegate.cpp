@@ -111,15 +111,12 @@ void StyleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
     QSortFilterProxyModel* proxy = qobject_cast<QSortFilterProxyModel*>(const_cast<QAbstractItemModel*>(index.model()));
 
     int song_id = index.data(Roles::Id).toInt();
-    CoverUtils::loadCoverAsync(song_id, path, QSize(ICON_SIZE, ICON_SIZE), 5,
-                               [painter, iconRect](const QPixmap& pix){
-                                    painter->drawPixmap(iconRect, pix);
-                                },
-                               [painter, iconRect, &option](){
-                                    painter->drawPixmap(iconRect, defaultCover());
-                                },
+    bool res = CoverUtils::loadCoverAsync(song_id, path, QSize(ICON_SIZE, ICON_SIZE), 5,
+                               [painter, iconRect](const QPixmap& pix){ painter->drawPixmap(iconRect, pix);},
                                QVariant::fromValue(proxy)
     );
+
+    if(!res) painter->drawPixmap(iconRect, defaultCover());
 
 
     // 右侧保留区域：时长 + 按钮

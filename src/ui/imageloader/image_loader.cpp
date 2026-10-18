@@ -1,6 +1,7 @@
 #include "image_loader.h"
 #include "url_config.h"
 #include "http_request.h"
+#include "url_utils.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QImage>
@@ -32,31 +33,35 @@ void ImageLoader::addTask(const ImageTask& task)
         QMutexLocker locker(&m_mutex);
 
         if(m_cache.contains(task.key)){
+
+            locker.unlock();
+
             QMetaObject::invokeMethod(this, [this, task](){
-                emit imageLoaded(task.song_id, task.path, task.var);
+                emit imageLoaded(task.cover_id, task.path, task.var);
             }, Qt::QueuedConnection);
 
             return;
         }
 
-        if(m_set.contains(task.song_id)){
+        if(m_set.contains(task.cover_id)){
             for(int i = 0; i < m_queue.size(); ++i){
-                if(m_queue[i].song_id == task.song_id){
+                if(m_queue[i].cover_id == task.cover_id){
                     m_queue[i].arr.append(task);
+                    locker.unlock();
                     return;
                 }
             }
         }
+
+        m_set.insert(task.cover_id);
+
+        ImageMergedTask mergeTask;
+        mergeTask.path = task.path;
+        mergeTask.cover_id = task.cover_id;
+        mergeTask.arr = QVector<ImageTask>{task};
+
+        m_queue.enqueue(mergeTask);
     }
-
-    m_set.insert(task.song_id);
-
-    ImageMergedTask mergeTask;
-    mergeTask.path = task.path;
-    mergeTask.song_id = task.song_id;
-    mergeTask.arr = QVector<ImageTask>{task};
-
-    m_queue.enqueue(mergeTask);
 
     QMetaObject::invokeMethod(this, &ImageLoader::process, Qt::QueuedConnection);
 }
@@ -73,7 +78,7 @@ void ImageLoader::process()
 
         mergeTask = m_queue.dequeue();
 
-        m_set.remove(mergeTask.song_id);
+        m_set.remove(mergeTask.cover_id);
     }
 
     QVector<ImageTask> pendingTasks;
@@ -81,7 +86,7 @@ void ImageLoader::process()
         QMutexLocker locker(&m_mutex);
         for(ImageTask &task : mergeTask.arr){
             if(m_cache.contains(task.key)){
-                emit imageLoaded(mergeTask.song_id, mergeTask.path, task.var);
+                emit imageLoaded(mergeTask.cover_id, mergeTask.path, task.var);
             }
             else{
                 pendingTasks.append(task);
@@ -94,11 +99,9 @@ void ImageLoader::process()
     }
 
     QString path = mergeTask.path;
-    int song_id = mergeTask.song_id;
+    int song_id = mergeTask.cover_id;
 
-    if (!path.startsWith("http://", Qt::CaseInsensitive) &&
-        !path.startsWith("https://", Qt::CaseInsensitive)) {
-
+    if (!UrlUtils::isHttpUrl(path)) {
         QImage source(path);
 
         finishImage(song_id, path, source, pendingTasks);

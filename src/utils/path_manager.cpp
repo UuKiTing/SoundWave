@@ -64,5 +64,10 @@ bool ensureDirectories()
            && dir.mkpath(logsDir());
 }
 
+QString configFilePath()
+{
+    return "url.config";
+}
+
 
 }

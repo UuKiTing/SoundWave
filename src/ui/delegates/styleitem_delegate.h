@@ -7,9 +7,6 @@
 #include <QPixmap>
 #include <QFutureWatcher>
 
-class ImageLoader;
-class ImageTask;
-
 class StyleItemDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
@@ -40,9 +37,6 @@ private:
     const int BUTTON_MARGIN_RIGHT = 25 + DUR_WIDTH + DUR_MARGIN_RIGHT;
     const int MARK_ICON_MARGIN_RIGHT = 25 + BUTTON_SIZE +  BUTTON_MARGIN_RIGHT;
     const int TEXT_MARGIN_LEFT = 15;
-
-    ImageLoader* m_loader;
-    QThread* m_thread;
 };
 
 #endif // STYLEITEM_DELEGATE_H

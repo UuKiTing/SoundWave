@@ -65,7 +65,6 @@ protected:
         }
     }
 
-
 private:
     QQueue<QString> m_queue;
     QMutex m_mutex;

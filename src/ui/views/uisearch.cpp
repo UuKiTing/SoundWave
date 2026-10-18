@@ -32,9 +32,6 @@ void UISearch::connectSignal()
 {
     // 搜索列表双击播放事件
     connect(m_previewPanel->searchListView(), &QListView::doubleClicked, this, &UISearch::doubleClickPlay);
-
-    // 搜索栏文本变化事件
-    // connect(ui->searchBar, &QLineEdit::textChanged, this, &UISearch::switchStackedWidget);
 }
 
 void UISearch::doubleClickPlay(const QModelIndex &index)
@@ -42,11 +39,8 @@ void UISearch::doubleClickPlay(const QModelIndex &index)
     // 延迟隐藏预览面板，避免在双击时立即隐藏导致的界面闪烁
     QTimer::singleShot(100, this, &UISearch::hidePreviewPanel);
 
-    // 获取搜索列表的模型，并将索引映射到源模型
-    QSortFilterProxyModel *model = qobject_cast<QSortFilterProxyModel*>(m_previewPanel->searchListView()->model());
-
-    // 发射播放歌曲请求信号，传递源模型索引和自动播放标志
-    emit songPlayRequest(model->mapToSource(index), true);
+    // 发射播放歌曲请求信号
+    emit songPlayRequest(index, true);
 }
 
 void UISearch::switchStackedWidget(QString text)
@@ -90,17 +84,6 @@ QLineEdit *UISearch::searchBar()
 {
     return ui->searchBar;
 }
-
-void UISearch::on_searchBtn_clicked()
-{
-
-}
-
-
-void UISearch::on_searchBar_returnPressed()
-{
-}
-
 
 bool UISearch::eventFilter(QObject *watched, QEvent *event)
 {

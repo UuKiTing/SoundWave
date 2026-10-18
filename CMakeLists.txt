@@ -27,37 +27,35 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SRC_FILES} ${RES_FILES})
 
 qt_add_executable(${PROJECT_NAME}
     MANUAL_FINALIZATION
-    main.cpp
     ${SRC_FILES}
     ${RES_FILES}
 )
 
 
-target_link_libraries(SoundWave PRIVATE Qt6::Core)
-target_link_libraries(SoundWave PRIVATE Qt6::Core)
-target_link_libraries(SoundWave PRIVATE Qt6::Core)
-target_link_libraries(SoundWave PRIVATE Qt6::Core)
 set_target_properties(${PROJECT_NAME} PROPERTIES
     AUTOUIC_SEARCH_PATHS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/forms"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/views;${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/app/mediator
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/window
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/views
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/delegates
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/imageloader
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/mediator
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/player
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/models
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/models/proxies
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/db
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/http
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service/player
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service/models
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service/models/proxies
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service/db
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/service/http
     ${CMAKE_CURRENT_SOURCE_DIR}/src/types
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

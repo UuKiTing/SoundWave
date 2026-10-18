@@ -21,6 +21,8 @@ void Timer::createTimer(int msec, bool singleShot, std::function<bool()> func)
     }
 
     this->start(msec);
+
+    emit timerStarted();
 }
 
 QString Timer::timeToString(int msec)

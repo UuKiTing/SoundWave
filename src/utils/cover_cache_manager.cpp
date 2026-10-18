@@ -2,7 +2,6 @@
 
 CoverCacheManager::CoverCacheManager() {
     m_coverCache.setMaxCost(CACHE_LIMIT);
-
 }
 
 CoverCacheManager &CoverCacheManager::getInstance()
@@ -11,20 +10,20 @@ CoverCacheManager &CoverCacheManager::getInstance()
     return manager;
 }
 
-QImage *CoverCacheManager::get(const QString &key)
+QImage *CoverCacheManager::get(const QString &key) const
 {
-    QMutexLocker locker(&m_mutex);
+    QReadLocker locker(&m_lock);
     return m_coverCache.object(key);
 }
 
 bool CoverCacheManager::insert(const QString &key, QImage *image, int cost)
 {
-    QMutexLocker locker(&m_mutex);
+    QWriteLocker locker(&m_lock);
     return m_coverCache.insert(key, image, cost);
 }
 
 bool CoverCacheManager::contains(const QString &key)
 {
-    QMutexLocker locker(&m_mutex);
+    QReadLocker locker(&m_lock);
     return m_coverCache.contains(key);
 }
